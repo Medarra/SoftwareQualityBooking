@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#213b36">
+    <title>Goodday Studio | Appointments</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#book" aria-label="Goodday Studio home">
+        <span class="brand-mark" aria-hidden="true">g</span>
+        <span class="brand-copy"><strong>goodday</strong><small>STUDIO APPOINTMENTS</small></span>
+      </a>
+      <nav class="main-nav" aria-label="Main navigation">
+        <button class="nav-link active" type="button" data-view="book">Book a visit</button>
+        <button class="nav-link" type="button" data-view="appointments">Appointments <span id="appointment-count" class="nav-count">0</span></button>
+        <button class="nav-link" type="button" data-view="settings">Studio setup</button>
+      </nav>
+      <div class="studio-status"><span class="status-dot"></span><span>RIVER NORTH, CHICAGO</span></div>
+    </header>
+
+    <main class="page-wrap">
+      <section class="view active" id="view-book" aria-labelledby="book-title">
+        <div class="page-heading">
+          <div><p class="eyebrow">YOUR TIME, WELL SPENT</p><h1 id="book-title">Book a visit<span class="heading-period">.</span></h1></div>
+          <p class="heading-note">Pick a service, find your person, and we’ll save you a seat.</p>
+        </div>
+
+        <form id="booking-form" class="booking-layout">
+          <div class="booking-main">
+            <section class="form-section service-section">
+              <div class="section-heading"><span class="step-number">01</span><div><h2>Choose your service</h2><p>A little time set aside for yourself.</p></div></div>
+              <label class="field-label" for="service-select">SERVICE</label>
+              <select id="service-select" name="serviceId" required></select>
+            </section>
+
+            <section class="form-section provider-section">
+              <div class="section-heading"><span class="step-number">02</span><div><h2>Choose your person</h2><p>Everyone here has a chair ready.</p></div></div>
+              <div id="provider-options" class="provider-options"></div>
+            </section>
+
+            <section class="form-section time-section">
+              <div class="section-heading"><span class="step-number">03</span><div><h2>Find a time</h2><p>Open appointments update as you book.</p></div></div>
+              <label class="field-label" for="booking-date">DATE</label>
+              <input id="booking-date" name="date" type="date" required>
+              <div id="availability" class="availability-grid" aria-live="polite"></div>
+            </section>
+          </div>
+
+          <aside class="booking-aside">
+            <div class="aside-topline"><span>YOUR APPOINTMENT</span><span class="aside-spark" aria-hidden="true">✳</span></div>
+            <div id="booking-summary" class="booking-summary"><p>Choose a service and a time to get started.</p></div>
+            <div class="aside-rule"></div>
+            <label class="field-label" for="visitor-name">WHO IS THIS VISIT FOR?</label>
+            <input id="visitor-name" name="visitorName" type="text" maxlength="80" placeholder="Name of the person attending" required>
+            <div id="anonymous-control" class="anonymous-control">
+              <label class="check-row"><input id="anonymous-booking" name="anonymous" type="checkbox"><span>Book without a profile</span></label>
+            </div>
+            <div id="contact-fields" class="contact-fields">
+              <label class="field-label" for="patron-name">BOOKING CONTACT</label>
+              <input id="patron-name" name="patronName" type="text" maxlength="80" autocomplete="name" placeholder="Your name">
+              <label class="field-label" for="patron-email">EMAIL</label>
+              <input id="patron-email" name="patronEmail" type="email" maxlength="160" autocomplete="email" placeholder="you@example.com">
+            </div>
+            <button id="submit-booking" class="primary-button" type="submit" disabled><span id="submit-label">Confirm appointment</span><span aria-hidden="true">→</span></button>
+            <button id="cancel-edit" class="text-button hidden" type="button">Leave edit mode</button>
+            <p class="fine-print">No charge today. The studio will be ready when you are.</p>
+          </aside>
+        </form>
+      </section>
+
+      <section class="view" id="view-appointments" aria-labelledby="appointments-title">
+        <div class="page-heading">
+          <div><p class="eyebrow">THE STUDIO, IN SYNC</p><h1 id="appointments-title">Appointments<span class="heading-period">.</span></h1></div>
+          <button class="primary-button compact-button" type="button" data-view="book">New appointment <span aria-hidden="true">+</span></button>
+        </div>
+        <div class="filter-bar">
+          <label class="filter-field"><span>DATE</span><input id="filter-date" type="date"></label>
+          <label class="filter-field"><span>SERVICE PROVIDER</span><select id="filter-provider"><option value="">Everyone</option></select></label>
+          <button id="clear-filters" class="text-button" type="button">Clear filters</button>
+        </div>
+        <div class="table-heading"><span id="results-count">0 appointments</span><span>LOCAL STUDIO TIME</span></div>
+        <div id="appointments-list" class="appointments-list"></div>
+      </section>
+
+      <section class="view" id="view-settings" aria-labelledby="settings-title">
+        <div class="page-heading">
+          <div><p class="eyebrow">MAKE IT YOUR STUDIO</p><h1 id="settings-title">Studio setup<span class="heading-period">.</span></h1></div>
+          <p class="heading-note">Set the booking rules and shape each provider’s calendar.</p>
+        </div>
+        <form id="policy-form" class="policy-row">
+          <div><span class="settings-kicker">PATRON DETAILS</span><h2>Require registration</h2><p>When on, a booking contact name and email are required for every appointment.</p></div>
+          <label class="switch"><input id="registration-required" type="checkbox"><span class="switch-track"></span><span class="sr-only">Require registration</span></label>
+        </form>
+        <div class="provider-settings-heading"><div><span class="settings-kicker">TEAM CALENDARS</span><h2>Provider availability</h2></div><p>Appointment length is the size of each bookable block.</p></div>
+        <div id="provider-settings" class="provider-settings-list"></div>
+      </section>
+
+      <footer class="page-footer"><span>GOODDAY STUDIO</span><span>GOOD APPOINTMENTS. BETTER DAYS.</span></footer>
+    </main>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

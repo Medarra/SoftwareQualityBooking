@@ -1,0 +1,16 @@
+List of Prompts Used for Application:
+1. I'm looking to create a booking application with a front end and a back end. These are the requirements:
+
+This will be a web application that customers and clients will use to book appointments with
+service providers (for example a hair salon or barbershop).
+The requirements obtained thus far by the Product Owner are:
+ Patrons can register or book anonymously (the requirement to register can be set by the
+vendor)
+ Patrons and service providers can Create, Change, and Cancel appointments
+ Appointments can be selected from a variety of service providers (for example choosing
+your preferred stylist)
+ Show service providers’ availability (once the appointment has been booked, that
+availability block is no longer available and is freed if the appointment is canceled)
+ Service providers set the availability block duration
+ Patrons can set appointments for other individuals with other service providers
+concurrently (provided availability).
