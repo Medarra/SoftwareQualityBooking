@@ -1,5 +1,6 @@
 const state = {
   settings: { registrationRequired: false },
+  user: null,
   services: [],
   providers: [],
   appointments: [],
@@ -15,8 +16,16 @@ const elements = Object.fromEntries([
   'anonymous-booking', 'anonymous-control', 'contact-fields', 'patron-name', 'patron-email',
   'submit-booking', 'submit-label', 'cancel-edit', 'booking-summary', 'appointment-count',
   'appointments-list', 'filter-date', 'filter-provider', 'results-count', 'clear-filters',
-  'registration-required', 'provider-settings', 'policy-form', 'toast'
+  'registration-required', 'provider-settings', 'policy-form', 'toast', 'appointments-nav',
+  'account-nav', 'settings-nav', 'auth-trigger', 'sign-out', 'signed-in-name', 'auth-dialog',
+  'auth-form', 'auth-name', 'auth-role', 'auth-email', 'auth-password', 'auth-provider',
+  'invite-code', 'register-fields', 'stylist-fields', 'auth-title', 'auth-eyebrow',
+  'auth-submit', 'auth-note', 'login-mode', 'register-mode', 'close-auth',
+  'preferences-form', 'favorite-provider', 'favorite-service', 'account-history', 'book-title', 'appointments-title',
+  'provider-filter-field', 'new-appointment-button'
 ].map((id) => [id, document.getElementById(id)]));
+
+let authMode = 'login';
 
 function localDate(date = new Date()) {
   const year = date.getFullYear();
@@ -68,14 +77,27 @@ function formatTime(time) {
 }
 
 function renderServices() {
+  const selected = elements['service-select'].value || state.user?.favoriteServiceId || '';
   elements['service-select'].innerHTML = state.services.map((service) =>
     `<option value="${escapeHtml(service.id)}">${escapeHtml(service.name)} · $${service.price}</option>`
   ).join('');
+  if (state.user?.role === 'stylist') {
+    const provider = providerById(state.user.providerId);
+    [...elements['service-select'].options].forEach((option) => {
+      option.hidden = !provider?.serviceIds.includes(option.value);
+    });
+  }
+  if (selected && serviceById(selected) && !elements['service-select'].selectedOptions[0]?.hidden) elements['service-select'].value = selected;
 }
 
 function renderProviders() {
   const service = serviceById(elements['service-select'].value);
-  const availableProviders = state.providers.filter((provider) => provider.serviceIds.includes(service?.id));
+  let availableProviders = state.providers.filter((provider) => provider.serviceIds.includes(service?.id));
+  if (state.user?.role === 'stylist') availableProviders = availableProviders.filter((provider) => provider.id === state.user.providerId);
+  if (state.user?.role === 'patron' && state.user.favoriteProviderId) {
+    const favorite = availableProviders.find((provider) => provider.id === state.user.favoriteProviderId);
+    if (favorite && !state.providerId) state.providerId = favorite.id;
+  }
   if (!availableProviders.some((provider) => provider.id === state.providerId)) state.providerId = availableProviders[0]?.id || '';
   elements['provider-options'].innerHTML = availableProviders.map((provider) => `
     <button class="provider-card${provider.id === state.providerId ? ' selected' : ''}" type="button" data-provider-id="${escapeHtml(provider.id)}" aria-pressed="${provider.id === state.providerId}">
@@ -127,16 +149,23 @@ async function loadAvailability() {
 }
 
 function updateContactFields() {
-  const anonymous = elements['anonymous-booking'].checked && !state.settings.registrationRequired;
-  elements['contact-fields'].classList.toggle('hidden', anonymous);
-  elements['patron-name'].required = !anonymous;
-  elements['patron-email'].required = !anonymous;
+  const accountBooking = state.user?.role === 'patron';
+  const stylistEdit = state.user?.role === 'stylist';
+  const anonymous = elements['anonymous-booking'].checked && !state.settings.registrationRequired && !accountBooking && !stylistEdit;
+  elements['anonymous-control'].classList.toggle('hidden', Boolean(accountBooking) || stylistEdit || state.settings.registrationRequired);
+  elements['contact-fields'].classList.toggle('hidden', accountBooking || anonymous || stylistEdit);
+  elements['patron-name'].required = !accountBooking && !anonymous && !stylistEdit;
+  elements['patron-email'].required = !accountBooking && !anonymous && !stylistEdit;
 }
 
 function showView(name) {
+  if (name === 'appointments' && !state.user) return openAuthDialog();
+  if (name === 'account' && state.user?.role !== 'patron') return;
+  if (name === 'book' && state.user?.role === 'stylist' && !state.editingId) return;
   document.querySelectorAll('.view').forEach((view) => view.classList.toggle('active', view.id === `view-${name}`));
   document.querySelectorAll('.nav-link').forEach((button) => button.classList.toggle('active', button.dataset.view === name));
   if (name === 'appointments') loadAppointments();
+  if (name === 'account') renderAccount();
   if (name === 'settings') renderSettings();
 }
 
@@ -168,7 +197,7 @@ function renderAppointments() {
   elements['appointments-list'].innerHTML = total ? state.appointments.map((appointment) => `
     <article class="appointment-row">
       <div class="appointment-time"><strong>${formatTime(appointment.time)}</strong><span>${formatDate(appointment.date)}</span></div>
-      <div class="appointment-person"><strong>${escapeHtml(appointment.visitorName)}</strong><span>${escapeHtml(appointment.serviceName)}${appointment.anonymous ? ' · Guest booking' : ''}</span></div>
+      <div class="appointment-person"><strong>${escapeHtml(appointment.visitorName)}</strong><span>${escapeHtml(appointment.serviceName)}${appointment.anonymous ? ' · Guest booking' : ''}${state.user?.role === 'stylist' && appointment.patronName ? `<br>Booked by ${escapeHtml(appointment.patronName)} · ${escapeHtml(appointment.patronEmail)}` : ''}</span></div>
       <div class="appointment-provider"><strong>${escapeHtml(appointment.providerName)}</strong><span>${appointment.durationMinutes} minutes</span></div>
       <div class="appointment-price">$${appointment.price}</div>
       <div class="appointment-actions"><button type="button" data-edit-id="${escapeHtml(appointment.id)}">Change</button><button class="cancel-action" type="button" data-cancel-id="${escapeHtml(appointment.id)}">Cancel</button></div>
@@ -187,6 +216,85 @@ function renderSettings() {
     </form>`).join('');
 }
 
+function syncRoleUI() {
+  const user = state.user;
+  const isStylist = user?.role === 'stylist';
+  const isPatron = user?.role === 'patron';
+  elements['appointments-nav'].classList.toggle('hidden', !user);
+  elements['account-nav'].classList.toggle('hidden', !isPatron);
+  elements['provider-filter-field'].classList.toggle('hidden', isStylist);
+  elements['new-appointment-button'].classList.toggle('hidden', isStylist);
+  elements['auth-trigger'].classList.toggle('hidden', Boolean(user));
+  elements['sign-out'].classList.toggle('hidden', !user);
+  elements['signed-in-name'].classList.toggle('hidden', !user);
+  elements['signed-in-name'].textContent = user?.name || '';
+  elements['appointments-nav'].firstChild.textContent = isStylist ? 'My schedule ' : 'My appointments ';
+  elements['book-title'].innerHTML = isStylist && !state.editingId
+    ? 'Your schedule<span class="heading-period">.</span>'
+    : 'Book a visit<span class="heading-period">.</span>';
+  document.querySelector('[data-view="book"]').classList.toggle('hidden', isStylist && !state.editingId);
+  document.getElementById('view-book').classList.toggle('hidden', isStylist && !state.editingId);
+  if (isPatron && !elements['visitor-name'].value) elements['visitor-name'].value = user.name;
+  if (isStylist) elements['appointments-title'].textContent = 'Your schedule.';
+  else elements['appointments-title'].textContent = 'Appointments.';
+  updateContactFields();
+}
+
+async function renderAccount() {
+  if (state.user?.role !== 'patron') return;
+  try {
+    const { user, history } = await api('/api/account');
+    state.user = user;
+    elements['favorite-provider'].innerHTML = '<option value="">No preference</option>' + state.providers.map((provider) =>
+      `<option value="${escapeHtml(provider.id)}">${escapeHtml(provider.name)}</option>`
+    ).join('');
+    elements['favorite-service'].innerHTML = '<option value="">No preference</option>' + state.services.map((service) =>
+      `<option value="${escapeHtml(service.id)}">${escapeHtml(service.name)}</option>`
+    ).join('');
+    elements['favorite-provider'].value = user.favoriteProviderId;
+    elements['favorite-service'].value = user.favoriteServiceId;
+    elements['account-history'].innerHTML = history.length ? history.map((appointment) => `
+      <article class="history-row">
+        <div><strong>${formatDate(appointment.date)}</strong><span>${formatTime(appointment.time)}</span></div>
+        <div><strong>${escapeHtml(appointment.serviceName)}</strong><span>${escapeHtml(appointment.visitorName)}${appointment.anonymous ? ' · Guest booking' : ''}</span></div>
+        <div><strong>${escapeHtml(appointment.providerName)}</strong><span>${appointment.durationMinutes} minutes</span></div>
+        <div class="history-price">$${appointment.price}</div>
+      </article>`).join('') : '<div class="history-empty">Your visits will appear here after you book.</div>';
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  const registering = mode === 'register';
+  elements['register-fields'].classList.toggle('hidden', !registering);
+  elements['auth-name'].required = registering;
+  elements['auth-role'].required = registering;
+  elements['auth-title'].textContent = registering ? 'Create an account' : 'Sign in';
+  elements['auth-eyebrow'].textContent = registering ? 'A GOOD PLACE TO START' : 'WELCOME BACK';
+  elements['auth-submit'].firstElementChild.textContent = registering ? 'Create account' : 'Sign in';
+  elements['auth-note'].textContent = registering
+    ? 'Customer accounts remember your favourite stylist, service, and visits. Stylist accounts need a studio invitation code.'
+    : 'Your account keeps your preferences and appointment history together.';
+  elements['login-mode'].classList.toggle('active', !registering);
+  elements['register-mode'].classList.toggle('active', registering);
+  elements['auth-password'].autocomplete = registering ? 'new-password' : 'current-password';
+  const stylist = registering && elements['auth-role'].value === 'stylist';
+  elements['stylist-fields'].classList.toggle('hidden', !stylist);
+  elements['auth-provider'].required = stylist;
+  elements['invite-code'].required = stylist;
+  elements['auth-provider'].innerHTML = state.providers.map((provider) =>
+    `<option value="${escapeHtml(provider.id)}"${provider.accountAvailable ? '' : ' disabled'}>${escapeHtml(provider.name)}${provider.accountAvailable ? '' : ' · account exists'}</option>`
+  ).join('');
+}
+
+function openAuthDialog() {
+  elements['auth-form'].reset();
+  setAuthMode('login');
+  elements['auth-dialog'].showModal();
+}
+
 function setEditing(appointment) {
   state.editingId = appointment.id;
   state.providerId = appointment.providerId;
@@ -201,6 +309,8 @@ function setEditing(appointment) {
   elements['patron-email'].value = appointment.patronEmail;
   elements['submit-label'].textContent = 'Save appointment changes';
   elements['cancel-edit'].classList.remove('hidden');
+  document.getElementById('view-book').classList.remove('hidden');
+  document.querySelector('[data-view="book"]').classList.remove('hidden');
   updateContactFields();
   showView('book');
   loadAvailability().then(() => {
@@ -217,6 +327,7 @@ function clearEditing() {
   elements['booking-date'].value = localDate();
   elements['submit-label'].textContent = 'Confirm appointment';
   elements['cancel-edit'].classList.add('hidden');
+  syncRoleUI();
   updateContactFields();
   renderProviders();
 }
@@ -268,8 +379,12 @@ elements['booking-form'].addEventListener('submit', async (event) => {
     await api(route, { method, body: JSON.stringify(payload) });
     showToast(state.editingId ? 'Appointment updated.' : 'Appointment confirmed.');
     clearEditing();
-    await loadAppointments();
-    showView('appointments');
+    if (state.user) {
+      await loadAppointments();
+      showView('appointments');
+    } else {
+      await loadAvailability();
+    }
   } catch (error) {
     showToast(error.message);
     if (error.message.includes('no longer available')) loadAvailability();
@@ -279,6 +394,81 @@ elements['booking-form'].addEventListener('submit', async (event) => {
 elements['cancel-edit'].addEventListener('click', () => {
   clearEditing();
   showView('appointments');
+});
+
+elements['auth-trigger'].addEventListener('click', openAuthDialog);
+elements['close-auth'].addEventListener('click', () => elements['auth-dialog'].close());
+elements['login-mode'].addEventListener('click', () => setAuthMode('login'));
+elements['register-mode'].addEventListener('click', () => setAuthMode('register'));
+elements['auth-role'].addEventListener('change', () => setAuthMode(authMode));
+
+elements['auth-form'].addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const values = new FormData(elements['auth-form']);
+  const registering = authMode === 'register';
+  const payload = { email: values.get('email'), password: values.get('password') };
+  if (registering) {
+    Object.assign(payload, {
+      name: values.get('name'),
+      role: values.get('role'),
+      providerId: values.get('providerId'),
+      inviteCode: values.get('inviteCode')
+    });
+  }
+  try {
+    const { user } = await api(`/api/auth/${registering ? 'register' : 'login'}`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    state.user = user;
+    state.appointments = [];
+    elements['auth-dialog'].close();
+    elements['auth-password'].value = '';
+    syncRoleUI();
+    renderServices();
+    renderProviders();
+    renderFilterProviders();
+    showView(user.role === 'stylist' ? 'appointments' : 'book');
+    showToast(`Welcome, ${user.name}.`);
+  } catch (error) {
+    elements['auth-note'].textContent = error.message;
+    elements['auth-note'].classList.add('auth-error');
+  }
+});
+
+elements['auth-form'].addEventListener('input', () => elements['auth-note'].classList.remove('auth-error'));
+
+elements['sign-out'].addEventListener('click', async () => {
+  try {
+    await api('/api/auth/session', { method: 'DELETE' });
+    state.user = null;
+    state.appointments = [];
+    clearEditing();
+    syncRoleUI();
+    showView('book');
+    showToast('You are signed out.');
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+elements['preferences-form'].addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const values = new FormData(elements['preferences-form']);
+  try {
+    const { user } = await api('/api/account', {
+      method: 'PATCH',
+      body: JSON.stringify({ favoriteProviderId: values.get('favoriteProviderId'), favoriteServiceId: values.get('favoriteServiceId') })
+    });
+    state.user = user;
+    elements['service-select'].value = user.favoriteServiceId || elements['service-select'].value;
+    state.providerId = user.favoriteProviderId || '';
+    renderServices();
+    renderProviders();
+    showToast('Your preferences are saved.');
+  } catch (error) {
+    showToast(error.message);
+  }
 });
 
 elements['appointments-list'].addEventListener('click', async (event) => {
@@ -351,14 +541,16 @@ async function start() {
     state.settings = data.settings;
     state.services = data.services;
     state.providers = data.providers;
-    state.appointments = data.appointments;
+    state.user = data.user;
+    state.appointments = [];
     elements['booking-date'].value = localDate();
-    elements['anonymous-control'].classList.toggle('hidden', state.settings.registrationRequired);
+    syncRoleUI();
     renderServices();
     renderProviders();
     renderFilterProviders();
     renderAppointments();
     updateContactFields();
+    showView(state.user?.role === 'stylist' ? 'appointments' : 'book');
   } catch (error) {
     showToast(`Could not connect to the booking service: ${error.message}`);
   }

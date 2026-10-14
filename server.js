@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const publicDirectory = resolve(root, 'public');
@@ -11,6 +11,8 @@ const port = Number(process.env.PORT || 3000);
 
 const initialStore = {
   settings: { registrationRequired: false },
+  users: [],
+  sessions: {},
   services: [
     { id: 'cut', name: 'Signature cut', category: 'Cut & style', price: 38 },
     { id: 'fade', name: 'Skin fade', category: 'Cut & style', price: 34 },
@@ -30,7 +32,10 @@ let writeQueue = Promise.resolve();
 
 async function readStore() {
   try {
-    return JSON.parse(await readFile(dataFile, 'utf8'));
+    const store = JSON.parse(await readFile(dataFile, 'utf8'));
+    store.users ||= [];
+    store.sessions ||= {};
+    return store;
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
     await mkdir(dirname(dataFile), { recursive: true });
@@ -55,6 +60,65 @@ async function changeStore(change) {
 function sendJson(response, status, value) {
   response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
   response.end(JSON.stringify(value));
+}
+
+function sessionTokenHash(token) {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+function userFromRequest(store, request) {
+  const cookies = Object.fromEntries((request.headers.cookie || '').split(';').map((part) => {
+    const separator = part.indexOf('=');
+    return separator < 0 ? ['', ''] : [part.slice(0, separator).trim(), part.slice(separator + 1).trim()];
+  }));
+  const token = cookies.goodday_session;
+  if (!token) return null;
+  const session = store.sessions[sessionTokenHash(token)];
+  if (!session || Date.parse(session.expiresAt) <= Date.now()) return null;
+  return store.users.find((user) => user.id === session.userId) || null;
+}
+
+function publicUser(user) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    providerId: user.providerId || null,
+    favoriteProviderId: user.favoriteProviderId || '',
+    favoriteServiceId: user.favoriteServiceId || ''
+  };
+}
+
+function requireUser(user) {
+  if (!user) fail(401, 'Sign in to view or manage appointments.');
+  return user;
+}
+
+function requireAppointmentAccess(user, appointment) {
+  if (user.role === 'stylist' && appointment.providerId === user.providerId) return;
+  if (user.role === 'patron' && appointment.patronUserId === user.id) return;
+  fail(403, 'You do not have access to this appointment.');
+}
+
+function setSession(response, store, user) {
+  const token = randomBytes(32).toString('hex');
+  store.sessions[sessionTokenHash(token)] = {
+    userId: user.id,
+    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+  };
+  response.setHeader('set-cookie', `goodday_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`);
+}
+
+function passwordRecord(password, salt = randomBytes(16).toString('hex')) {
+  return { salt, hash: scryptSync(password, salt, 64).toString('hex') };
+}
+
+function passwordMatches(password, user) {
+  const actual = Buffer.from(passwordRecord(password, user.passwordSalt).hash, 'hex');
+  const expected = Buffer.from(user.passwordHash, 'hex');
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
 function fail(status, message) {
@@ -119,21 +183,27 @@ function getAvailability(store, provider, date, ignoreId) {
   return slots;
 }
 
-function appointmentInput(store, input, existing) {
+function appointmentInput(store, input, existing, user) {
   const provider = store.providers.find((item) => item.id === input.providerId);
   const service = store.services.find((item) => item.id === input.serviceId);
   const date = input.date;
   const time = input.time;
   const visitorName = String(input.visitorName || '').trim();
-  const anonymous = Boolean(input.anonymous);
-  const patronName = String(input.patronName || '').trim();
-  const patronEmail = String(input.patronEmail || '').trim();
+  const patron = existing?.patronUserId
+    ? store.users.find((item) => item.id === existing.patronUserId)
+    : user?.role === 'patron' ? user : null;
+  const anonymous = user?.role === 'patron' ? false : existing && user?.role === 'stylist'
+    ? existing.anonymous
+    : Boolean(input.anonymous);
+  const patronName = patron?.name || (existing && user?.role === 'stylist' ? existing.patronName : String(input.patronName || '').trim());
+  const patronEmail = patron?.email || (existing && user?.role === 'stylist' ? existing.patronEmail : String(input.patronEmail || '').trim());
 
   if (!provider || !service || !provider.serviceIds.includes(service.id)) fail(400, 'Choose a service offered by this provider.');
   if (!parseDate(date) || date < new Date().toLocaleDateString('en-CA')) fail(400, 'Choose a valid date that is not in the past.');
   if (!visitorName) fail(400, 'Enter the name of the person attending.');
-  if (store.settings.registrationRequired && anonymous) fail(400, 'This studio requires booking contact details.');
-  if ((store.settings.registrationRequired || !anonymous) && (!patronName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(patronEmail))) {
+  if (store.settings.registrationRequired && !user && !existing) fail(401, 'Create an account or sign in to book at this studio.');
+  if (store.settings.registrationRequired && anonymous) fail(400, 'This studio requires an account to book.');
+  if (!anonymous && (!patronName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(patronEmail))) {
     fail(400, 'Enter the booking contact name and a valid email address.');
   }
 
@@ -153,6 +223,7 @@ function appointmentInput(store, input, existing) {
     anonymous,
     patronName: anonymous ? '' : patronName,
     patronEmail: anonymous ? '' : patronEmail,
+    patronUserId: patron?.id || existing?.patronUserId || null,
     updatedAt: new Date().toISOString()
   };
 }
@@ -160,9 +231,102 @@ function appointmentInput(store, input, existing) {
 async function handleApi(request, response, url) {
   const { pathname, searchParams } = url;
 
+  if (pathname === '/api/auth/register' && request.method === 'POST') {
+    const input = await readBody(request);
+    const name = String(input.name || '').trim();
+    const email = String(input.email || '').trim().toLowerCase();
+    const password = String(input.password || '');
+    const role = input.role;
+    const providerId = role === 'stylist' ? String(input.providerId || '') : '';
+
+    if (!name || name.length > 80 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail(400, 'Enter your name and a valid email address.');
+    if (password.length < 10) fail(400, 'Use a password with at least 10 characters.');
+    if (!['patron', 'stylist'].includes(role)) fail(400, 'Choose a customer or stylist account.');
+    if (role === 'stylist' && (!process.env.STYLIST_INVITE_CODE || input.inviteCode !== process.env.STYLIST_INVITE_CODE)) {
+      fail(403, 'A valid studio invitation code is required to create a stylist account.');
+    }
+
+    const result = await changeStore((store) => {
+      if (store.users.some((user) => user.email === email)) fail(409, 'An account with that email already exists.');
+      if (role === 'stylist') {
+        const provider = store.providers.find((item) => item.id === providerId);
+        if (!provider || provider.accountUserId) fail(400, 'Choose an available stylist profile.');
+      }
+      const credentials = passwordRecord(password);
+      const user = {
+        id: randomUUID(), name, email, role, providerId: providerId || null,
+        favoriteProviderId: '', favoriteServiceId: '',
+        passwordSalt: credentials.salt, passwordHash: credentials.hash,
+        createdAt: new Date().toISOString()
+      };
+      store.users.push(user);
+      if (providerId) store.providers.find((item) => item.id === providerId).accountUserId = user.id;
+      setSession(response, store, user);
+      return user;
+    });
+    return sendJson(response, 201, { user: publicUser(result) });
+  }
+
+  if (pathname === '/api/auth/login' && request.method === 'POST') {
+    const input = await readBody(request);
+    const email = String(input.email || '').trim().toLowerCase();
+    const password = String(input.password || '');
+    const result = await changeStore((store) => {
+      const user = store.users.find((item) => item.email === email);
+      if (!user || !passwordMatches(password, user)) fail(401, 'Email or password is incorrect.');
+      setSession(response, store, user);
+      return user;
+    });
+    return sendJson(response, 200, { user: publicUser(result) });
+  }
+
+  if (pathname === '/api/auth/session' && request.method === 'DELETE') {
+    const token = Object.fromEntries((request.headers.cookie || '').split(';').map((part) => {
+      const separator = part.indexOf('=');
+      return separator < 0 ? ['', ''] : [part.slice(0, separator).trim(), part.slice(separator + 1).trim()];
+    })).goodday_session;
+    if (token) await changeStore((store) => { delete store.sessions[sessionTokenHash(token)]; });
+    response.setHeader('set-cookie', 'goodday_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+    return sendJson(response, 200, { user: null });
+  }
+
+  if (pathname === '/api/auth/me' && request.method === 'GET') {
+    const store = await readStore();
+    return sendJson(response, 200, { user: publicUser(userFromRequest(store, request)) });
+  }
+
+  if (pathname === '/api/account' && request.method === 'GET') {
+    const store = await readStore();
+    const user = requireUser(userFromRequest(store, request));
+    if (user.role !== 'patron') fail(403, 'Customer preferences are only available on a customer account.');
+    const history = store.appointments
+      .filter((appointment) => appointment.patronUserId === user.id)
+      .sort((left, right) => right.date.localeCompare(left.date) || right.time.localeCompare(left.time));
+    return sendJson(response, 200, { user: publicUser(user), history });
+  }
+
+  if (pathname === '/api/account' && request.method === 'PATCH') {
+    const input = await readBody(request);
+    const requestUser = userFromRequest(await readStore(), request);
+    requireUser(requestUser);
+    const result = await changeStore((store) => {
+      const user = store.users.find((item) => item.id === requestUser.id);
+      if (user.role !== 'patron') fail(403, 'Only customers can update booking preferences.');
+      const favoriteProviderId = String(input.favoriteProviderId || '');
+      const favoriteServiceId = String(input.favoriteServiceId || '');
+      if (favoriteProviderId && !store.providers.some((item) => item.id === favoriteProviderId)) fail(400, 'Choose a valid favorite stylist.');
+      if (favoriteServiceId && !store.services.some((item) => item.id === favoriteServiceId)) fail(400, 'Choose a valid favorite service.');
+      user.favoriteProviderId = favoriteProviderId;
+      user.favoriteServiceId = favoriteServiceId;
+      return user;
+    });
+    return sendJson(response, 200, { user: publicUser(result) });
+  }
+
   if (request.method === 'GET' && pathname === '/api/bootstrap') {
     const store = await readStore();
-    return sendJson(response, 200, { settings: store.settings, services: store.services, providers: store.providers, appointments: store.appointments });
+    const providers = store.providers.map(({ accountUserId, ...provider }) => ({ ...provider, accountAvailable: !accountUserId }));
+    return sendJson(response, 200, { settings: store.settings, services: store.services, providers, user: publicUser(userFromRequest(store, request)) });
   }
 
   if (request.method === 'GET' && pathname === '/api/availability') {
@@ -174,10 +338,14 @@ async function handleApi(request, response, url) {
 
   if (request.method === 'GET' && pathname === '/api/appointments') {
     const store = await readStore();
+    const user = requireUser(userFromRequest(store, request));
     const date = searchParams.get('date');
-    const providerId = searchParams.get('providerId');
+    const requestedProviderId = searchParams.get('providerId');
+    if (user.role === 'stylist' && requestedProviderId && requestedProviderId !== user.providerId) fail(403, 'You can only view your own schedule.');
     const appointments = store.appointments
-      .filter((item) => (!date || item.date === date) && (!providerId || item.providerId === providerId))
+      .filter((item) => (!date || item.date === date) && (user.role === 'stylist'
+        ? item.providerId === user.providerId
+        : item.patronUserId === user.id && (!requestedProviderId || item.providerId === requestedProviderId)))
       .sort((left, right) => left.date.localeCompare(right.date) || left.time.localeCompare(right.time));
     return sendJson(response, 200, { appointments });
   }
@@ -214,8 +382,10 @@ async function handleApi(request, response, url) {
 
   if (request.method === 'POST' && pathname === '/api/appointments') {
     const input = await readBody(request);
+    const user = userFromRequest(await readStore(), request);
+    if (user?.role === 'stylist') fail(403, 'Stylist accounts cannot create customer bookings.');
     const appointment = await changeStore((store) => {
-      const record = { id: randomUUID(), ...appointmentInput(store, input) };
+      const record = { id: randomUUID(), ...appointmentInput(store, input, null, user) };
       record.createdAt = record.updatedAt;
       store.appointments.push(record);
       return record;
@@ -226,10 +396,13 @@ async function handleApi(request, response, url) {
   const appointmentMatch = /^\/api\/appointments\/([^/]+)$/.exec(pathname);
   if (appointmentMatch && request.method === 'PATCH') {
     const input = await readBody(request);
+    const user = requireUser(userFromRequest(await readStore(), request));
     const appointment = await changeStore((store) => {
       const index = store.appointments.findIndex((item) => item.id === appointmentMatch[1]);
       if (index < 0) fail(404, 'Appointment not found.');
-      const updated = { ...store.appointments[index], ...appointmentInput(store, input, store.appointments[index]) };
+      requireAppointmentAccess(user, store.appointments[index]);
+      if (user.role === 'stylist' && input.providerId !== user.providerId) fail(403, 'You can only keep this appointment on your own calendar.');
+      const updated = { ...store.appointments[index], ...appointmentInput(store, input, store.appointments[index], user) };
       store.appointments[index] = updated;
       return updated;
     });
@@ -237,9 +410,11 @@ async function handleApi(request, response, url) {
   }
 
   if (appointmentMatch && request.method === 'DELETE') {
+    const user = requireUser(userFromRequest(await readStore(), request));
     const result = await changeStore((store) => {
       const index = store.appointments.findIndex((item) => item.id === appointmentMatch[1]);
       if (index < 0) fail(404, 'Appointment not found.');
+      requireAppointmentAccess(user, store.appointments[index]);
       return store.appointments.splice(index, 1)[0];
     });
     return sendJson(response, 200, { appointment: result });

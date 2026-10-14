@@ -19,10 +19,12 @@
       </a>
       <nav class="main-nav" aria-label="Main navigation">
         <button class="nav-link active" type="button" data-view="book">Book a visit</button>
-        <button class="nav-link" type="button" data-view="appointments">Appointments <span id="appointment-count" class="nav-count">0</span></button>
-        <button class="nav-link" type="button" data-view="settings">Studio setup</button>
+        <button id="appointments-nav" class="nav-link hidden" type="button" data-view="appointments">My appointments <span id="appointment-count" class="nav-count">0</span></button>
+        <button id="account-nav" class="nav-link hidden" type="button" data-view="account">My account</button>
+        <button id="settings-nav" class="nav-link" type="button" data-view="settings">Studio setup</button>
       </nav>
       <div class="studio-status"><span class="status-dot"></span><span>RIVER NORTH, CHICAGO</span></div>
+      <div class="auth-actions"><span id="signed-in-name" class="signed-in-name hidden"></span><button id="auth-trigger" class="auth-button" type="button">Sign in</button><button id="sign-out" class="auth-button hidden" type="button">Sign out</button></div>
     </header>
 
     <main class="page-wrap">
@@ -78,15 +80,30 @@
       <section class="view" id="view-appointments" aria-labelledby="appointments-title">
         <div class="page-heading">
           <div><p class="eyebrow">THE STUDIO, IN SYNC</p><h1 id="appointments-title">Appointments<span class="heading-period">.</span></h1></div>
-          <button class="primary-button compact-button" type="button" data-view="book">New appointment <span aria-hidden="true">+</span></button>
+          <button id="new-appointment-button" class="primary-button compact-button" type="button" data-view="book">New appointment <span aria-hidden="true">+</span></button>
         </div>
         <div class="filter-bar">
           <label class="filter-field"><span>DATE</span><input id="filter-date" type="date"></label>
-          <label class="filter-field"><span>SERVICE PROVIDER</span><select id="filter-provider"><option value="">Everyone</option></select></label>
+          <label id="provider-filter-field" class="filter-field"><span>SERVICE PROVIDER</span><select id="filter-provider"><option value="">Everyone</option></select></label>
           <button id="clear-filters" class="text-button" type="button">Clear filters</button>
         </div>
         <div class="table-heading"><span id="results-count">0 appointments</span><span>LOCAL STUDIO TIME</span></div>
         <div id="appointments-list" class="appointments-list"></div>
+      </section>
+
+      <section class="view" id="view-account" aria-labelledby="account-title">
+        <div class="page-heading">
+          <div><p class="eyebrow">YOUR STUDIO, YOUR WAY</p><h1 id="account-title">My account<span class="heading-period">.</span></h1></div>
+          <p class="heading-note">Your favourite people and every visit, all together.</p>
+        </div>
+        <form id="preferences-form" class="policy-row preferences-row">
+          <div><span class="settings-kicker">YOUR DEFAULTS</span><h2>Make it your regular</h2><p>We’ll remember these choices next time you book.</p></div>
+          <label class="setting-field"><span>FAVOURITE STYLIST</span><select id="favorite-provider" name="favoriteProviderId"></select></label>
+          <label class="setting-field"><span>FAVOURITE SERVICE</span><select id="favorite-service" name="favoriteServiceId"></select></label>
+          <button class="save-provider" type="submit">Save preferences</button>
+        </form>
+        <div class="provider-settings-heading"><div><span class="settings-kicker">PAST & UPCOMING</span><h2>Your service history</h2></div></div>
+        <div id="account-history" class="appointments-list"></div>
       </section>
 
       <section class="view" id="view-settings" aria-labelledby="settings-title">
@@ -95,7 +112,7 @@
           <p class="heading-note">Set the booking rules and shape each provider’s calendar.</p>
         </div>
         <form id="policy-form" class="policy-row">
-          <div><span class="settings-kicker">PATRON DETAILS</span><h2>Require registration</h2><p>When on, a booking contact name and email are required for every appointment.</p></div>
+          <div><span class="settings-kicker">PATRON DETAILS</span><h2>Require a customer account</h2><p>When on, customers must create an account or sign in before booking.</p></div>
           <label class="switch"><input id="registration-required" type="checkbox"><span class="switch-track"></span><span class="sr-only">Require registration</span></label>
         </form>
         <div class="provider-settings-heading"><div><span class="settings-kicker">TEAM CALENDARS</span><h2>Provider availability</h2></div><p>Appointment length is the size of each bookable block.</p></div>
@@ -105,5 +122,29 @@
       <footer class="page-footer"><span>GOODDAY STUDIO</span><span>GOOD APPOINTMENTS. BETTER DAYS.</span></footer>
     </main>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <dialog id="auth-dialog" class="auth-dialog">
+      <form id="auth-form" class="auth-form">
+        <div class="dialog-heading"><div><p id="auth-eyebrow" class="eyebrow">WELCOME BACK</p><h2 id="auth-title">Sign in</h2></div><button id="close-auth" class="dialog-close" type="button" aria-label="Close">×</button></div>
+        <div class="auth-mode-switch"><button id="login-mode" class="mode-button active" type="button">Sign in</button><button id="register-mode" class="mode-button" type="button">Create account</button></div>
+        <div id="register-fields" class="hidden">
+          <label class="field-label" for="auth-name">YOUR NAME</label>
+          <input id="auth-name" name="name" type="text" maxlength="80" autocomplete="name">
+          <label class="field-label" for="auth-role">ACCOUNT TYPE</label>
+          <select id="auth-role" name="role"><option value="patron">Customer</option><option value="stylist">Stylist</option></select>
+          <div id="stylist-fields" class="hidden">
+            <label class="field-label" for="auth-provider">YOUR STYLIST PROFILE</label>
+            <select id="auth-provider" name="providerId"></select>
+            <label class="field-label" for="invite-code">STUDIO INVITATION CODE</label>
+            <input id="invite-code" name="inviteCode" type="password" autocomplete="off">
+          </div>
+        </div>
+        <label class="field-label" for="auth-email">EMAIL</label>
+        <input id="auth-email" name="email" type="email" maxlength="160" autocomplete="email" required>
+        <label class="field-label" for="auth-password">PASSWORD</label>
+        <input id="auth-password" name="password" type="password" minlength="10" autocomplete="current-password" required>
+        <p id="auth-note" class="auth-note">Your account keeps your preferences and appointment history together.</p>
+        <button id="auth-submit" class="primary-button" type="submit"><span>Sign in</span><span aria-hidden="true">→</span></button>
+      </form>
+    </dialog>
   </body>
 </html>
