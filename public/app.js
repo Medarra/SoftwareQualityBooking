@@ -1,3 +1,5 @@
+// The client keeps the current booking session, signed-in user, providers, services, and any transient UI state
+// in one place so rendering functions can react consistently to server data and user actions.
 const state = {
   settings: { registrationRequired: false },
   user: null,
@@ -27,6 +29,7 @@ const elements = Object.fromEntries([
 
 let authMode = 'login';
 
+// Shared helpers for formatting dates, escaping text for HTML injection safety, and talking to the API.
 function localDate(date = new Date()) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -76,6 +79,7 @@ function formatTime(time) {
   return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(new Date(2000, 0, 1, hour, minute));
 }
 
+// Rebuild the service dropdown whenever the app state or signed-in user changes so each role sees the correct catalog.
 function renderServices() {
   const selected = elements['service-select'].value || state.user?.favoriteServiceId || '';
   elements['service-select'].innerHTML = state.services.map((service) =>
@@ -90,6 +94,7 @@ function renderServices() {
   if (selected && serviceById(selected) && !elements['service-select'].selectedOptions[0]?.hidden) elements['service-select'].value = selected;
 }
 
+// Providers are filtered by the selected service and user role so stylists can only view their own schedule while patrons see relevant options.
 function renderProviders() {
   const service = serviceById(elements['service-select'].value);
   let availableProviders = state.providers.filter((provider) => provider.serviceIds.includes(service?.id));
@@ -121,6 +126,7 @@ function renderSummary() {
     <p class="summary-detail summary-price">$${service.price}</p>`;
 }
 
+// Ask the server for the open times for the currently selected provider and date, then render them as selectable buttons.
 async function loadAvailability() {
   const provider = providerById(state.providerId);
   const date = elements['booking-date'].value;
@@ -148,6 +154,7 @@ async function loadAvailability() {
   }
 }
 
+// Hide or show the guest-contact form based on account mode, anonymous booking rules, and whether the current user is a stylist.
 function updateContactFields() {
   const accountBooking = state.user?.role === 'patron';
   const stylistEdit = state.user?.role === 'stylist';
@@ -158,6 +165,7 @@ function updateContactFields() {
   elements['patron-email'].required = !accountBooking && !anonymous && !stylistEdit;
 }
 
+// Switch between the booking, appointments, account, and studio setup screens while protecting role-restricted views.
 function showView(name) {
   if (name === 'appointments' && !state.user) return openAuthDialog();
   if (name === 'account' && state.user?.role !== 'patron') return;
@@ -177,6 +185,7 @@ function renderFilterProviders() {
   elements['filter-provider'].value = selected;
 }
 
+// Fetch the current user’s appointment list and apply any active date/provider filters before rendering the table.
 async function loadAppointments() {
   const query = new URLSearchParams();
   if (elements['filter-date'].value) query.set('date', elements['filter-date'].value);
@@ -190,6 +199,7 @@ async function loadAppointments() {
   }
 }
 
+// Transform the raw appointment objects into the calendar-like card list that customers and stylists interact with.
 function renderAppointments() {
   const total = state.appointments.length;
   elements['appointment-count'].textContent = String(total);
@@ -204,6 +214,7 @@ function renderAppointments() {
     </article>`).join('') : '<div class="empty-state">No appointments match those filters.</div>';
 }
 
+// Build the studio configuration panel and provider-specific working-hour editors from the state returned by the backend.
 function renderSettings() {
   elements['registration-required'].checked = state.settings.registrationRequired;
   elements['provider-settings'].innerHTML = state.providers.map((provider) => `
@@ -216,6 +227,7 @@ function renderSettings() {
     </form>`).join('');
 }
 
+// Keep the navigation, title text, and form fields in sync with the logged-in role so stylists and patrons each see the correct workflow.
 function syncRoleUI() {
   const user = state.user;
   const isStylist = user?.role === 'stylist';
@@ -240,6 +252,7 @@ function syncRoleUI() {
   updateContactFields();
 }
 
+// Load the signed-in patron’s saved preferences and visit history from the API for the account page.
 async function renderAccount() {
   if (state.user?.role !== 'patron') return;
   try {
@@ -265,6 +278,7 @@ async function renderAccount() {
   }
 }
 
+// Toggle between sign-in and registration flows and dynamically show the extra studio-only fields needed for a stylist account.
 function setAuthMode(mode) {
   authMode = mode;
   const registering = mode === 'register';
@@ -289,6 +303,7 @@ function setAuthMode(mode) {
   ).join('');
 }
 
+// Reset the auth form each time the modal opens so the login/register mode always starts in a clean state.
 function openAuthDialog() {
   elements['auth-form'].reset();
   setAuthMode('login');
@@ -535,6 +550,7 @@ elements['provider-settings'].addEventListener('submit', async (event) => {
   }
 });
 
+// Bootstrap the app by fetching the studio metadata, setting up the UI, and showing the correct screen for the current user state.
 async function start() {
   try {
     const data = await api('/api/bootstrap');

@@ -16,3 +16,5 @@ availability block is no longer available and is freed if the appointment is can
 concurrently (provided availability).
 
 2. I think it would be neat to make registration mean that you could create an account so you could remember your preferences (favourite stylist, service history, etc), and if you were a stylist you could see who has you booked, and for what.
+
+3. Can you comment the code thouroughly?

@@ -9,6 +9,9 @@ const publicDirectory = resolve(root, 'public');
 const dataFile = resolve(root, 'data', 'booking.json');
 const port = Number(process.env.PORT || 3000);
 
+// The app keeps its entire booking state in one JSON document so the server can read and write it
+// atomically with a small, predictable data model. This includes studio rules, user accounts, active sessions,
+// service definitions, provider schedules, and the appointment ledger that drives the booking flow.
 const initialStore = {
   settings: { registrationRequired: false },
   users: [],
@@ -30,6 +33,8 @@ const initialStore = {
 
 let writeQueue = Promise.resolve();
 
+// Ensure the persisted store exists and always contains the core collections needed by the app.
+// If the JSON file is missing, we seed it with the initial booking catalog and default policy values.
 async function readStore() {
   try {
     const store = JSON.parse(await readFile(dataFile, 'utf8'));
@@ -44,6 +49,8 @@ async function readStore() {
   }
 }
 
+// Serialize writes with a shared promise chain so each mutation waits for the previous one to finish.
+// This avoids corrupted JSON writes when multiple API requests update the store at the same time.
 async function changeStore(change) {
   const operation = writeQueue.then(async () => {
     const store = await readStore();
@@ -62,10 +69,12 @@ function sendJson(response, status, value) {
   response.end(JSON.stringify(value));
 }
 
+// Hash the browser cookie value before storing it in the session map to avoid saving raw tokens in the JSON file.
 function sessionTokenHash(token) {
   return createHash('sha256').update(token).digest('hex');
 }
 
+// Rehydrate the authenticated user from the cookie-based session, returning null when the cookie is missing or expired.
 function userFromRequest(store, request) {
   const cookies = Object.fromEntries((request.headers.cookie || '').split(';').map((part) => {
     const separator = part.indexOf('=');
@@ -78,6 +87,7 @@ function userFromRequest(store, request) {
   return store.users.find((user) => user.id === session.userId) || null;
 }
 
+// Expose only a safe subset of the user profile to the browser so secrets like password hashes never leave the server.
 function publicUser(user) {
   if (!user) return null;
   return {
@@ -102,6 +112,7 @@ function requireAppointmentAccess(user, appointment) {
   fail(403, 'You do not have access to this appointment.');
 }
 
+// Create a signed-in session cookie for a user and persist the session record server-side with an expiry timestamp.
 function setSession(response, store, user) {
   const token = randomBytes(32).toString('hex');
   store.sessions[sessionTokenHash(token)] = {
@@ -111,6 +122,7 @@ function setSession(response, store, user) {
   response.setHeader('set-cookie', `goodday_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`);
 }
 
+// Hash the password with a per-user salt so stored credentials cannot be compared or recovered directly.
 function passwordRecord(password, salt = randomBytes(16).toString('hex')) {
   return { salt, hash: scryptSync(password, salt, 64).toString('hex') };
 }
@@ -127,6 +139,7 @@ function fail(status, message) {
   throw error;
 }
 
+// Read and parse the JSON request body while keeping request sizes reasonable and raising API errors for malformed payloads.
 async function readBody(request) {
   let body = '';
   for await (const chunk of request) {
@@ -165,6 +178,7 @@ function slotIsFree(store, provider, date, time, ignoreId) {
   });
 }
 
+// Build the list of open slots for a provider on a chosen date by checking each working-time block against the existing bookings.
 function getAvailability(store, provider, date, ignoreId) {
   const parsedDate = parseDate(date);
   if (!parsedDate || !provider.workingDays.includes(parsedDate.getDay())) return [];
@@ -183,6 +197,8 @@ function getAvailability(store, provider, date, ignoreId) {
   return slots;
 }
 
+// Validate a booking payload and normalize it into the record shape stored in the appointment list.
+// This centralizes the rules for service/provider matching, required contact info, and time-slot availability.
 function appointmentInput(store, input, existing, user) {
   const provider = store.providers.find((item) => item.id === input.providerId);
   const service = store.services.find((item) => item.id === input.serviceId);
@@ -228,6 +244,7 @@ function appointmentInput(store, input, existing, user) {
   };
 }
 
+// The API router dispatches the request to the correct CRUD-style handler for auth, settings, appointments, and provider availability.
 async function handleApi(request, response, url) {
   const { pathname, searchParams } = url;
 
@@ -425,6 +442,7 @@ async function handleApi(request, response, url) {
 
 const contentTypes = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8' };
 
+// Serve browser files from the public folder while blocking path traversal attempts and mapping root requests to the app shell.
 async function handleStatic(response, pathname) {
   const requestedPath = decodeURIComponent(pathname === '/' ? '/index.html' : pathname);
   const filePath = resolve(publicDirectory, `.${requestedPath}`);
@@ -438,6 +456,7 @@ async function handleStatic(response, pathname) {
   }
 }
 
+// Create the HTTP listener and route every request to either the API or the static file server.
 const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
