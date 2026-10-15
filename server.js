@@ -8,6 +8,9 @@ const root = dirname(fileURLToPath(import.meta.url));
 const publicDirectory = resolve(root, 'public');
 const dataFile = resolve(root, 'data', 'booking.json');
 const port = Number(process.env.PORT || 3000);
+const adminEmail = (process.env.ADMIN_EMAIL || 'admin@goodday.studio').trim().toLowerCase();
+const adminPassword = process.env.ADMIN_PASSWORD || 'goodday-admin-2026';
+const stylistInviteCode = process.env.STYLIST_INVITE_CODE || 'goodday-demo-team';
 
 // The app keeps its entire booking state in one JSON document so the server can read and write it
 // atomically with a small, predictable data model. This includes studio rules, user accounts, active sessions,
@@ -106,6 +109,12 @@ function requireUser(user) {
   return user;
 }
 
+function requireAdmin(user) {
+  requireUser(user);
+  if (user.role !== 'admin') fail(403, 'Only the studio administrator can change studio setup.');
+  return user;
+}
+
 function requireAppointmentAccess(user, appointment) {
   if (user.role === 'stylist' && appointment.providerId === user.providerId) return;
   if (user.role === 'patron' && appointment.patronUserId === user.id) return;
@@ -131,6 +140,37 @@ function passwordMatches(password, user) {
   const actual = Buffer.from(passwordRecord(password, user.passwordSalt).hash, 'hex');
   const expected = Buffer.from(user.passwordHash, 'hex');
   return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+async function ensureAdminAccount() {
+  if (adminPassword.length < 10) throw new Error('ADMIN_PASSWORD must contain at least 10 characters.');
+  const store = await readStore();
+  const existing = store.users.find((user) => user.email === adminEmail);
+  if (existing) {
+    if (existing.role !== 'admin') throw new Error(`ADMIN_EMAIL ${adminEmail} is already used by a non-admin account.`);
+    return;
+  }
+
+  const credentials = passwordRecord(adminPassword);
+  await changeStore((currentStore) => {
+    const concurrentAccount = currentStore.users.find((user) => user.email === adminEmail);
+    if (concurrentAccount) {
+      if (concurrentAccount.role !== 'admin') throw new Error(`ADMIN_EMAIL ${adminEmail} is already used by a non-admin account.`);
+      return;
+    }
+    currentStore.users.push({
+      id: randomUUID(),
+      name: 'Studio Administrator',
+      email: adminEmail,
+      role: 'admin',
+      providerId: null,
+      favoriteProviderId: '',
+      favoriteServiceId: '',
+      passwordSalt: credentials.salt,
+      passwordHash: credentials.hash,
+      createdAt: new Date().toISOString()
+    });
+  });
 }
 
 function fail(status, message) {
@@ -254,34 +294,54 @@ async function handleApi(request, response, url) {
     const email = String(input.email || '').trim().toLowerCase();
     const password = String(input.password || '');
     const role = input.role;
-    const providerId = role === 'stylist' ? String(input.providerId || '') : '';
+    const serviceIds = role === 'stylist' && Array.isArray(input.serviceIds)
+      ? [...new Set(input.serviceIds.map((id) => String(id)))]
+      : [];
 
     if (!name || name.length > 80 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail(400, 'Enter your name and a valid email address.');
     if (password.length < 10) fail(400, 'Use a password with at least 10 characters.');
     if (!['patron', 'stylist'].includes(role)) fail(400, 'Choose a customer or stylist account.');
-    if (role === 'stylist' && (!process.env.STYLIST_INVITE_CODE || input.inviteCode !== process.env.STYLIST_INVITE_CODE)) {
+    if (role === 'stylist' && !serviceIds.length) fail(400, 'Choose at least one service for your stylist profile.');
+    if (role === 'stylist' && input.inviteCode !== stylistInviteCode) {
       fail(403, 'A valid studio invitation code is required to create a stylist account.');
     }
 
     const result = await changeStore((store) => {
       if (store.users.some((user) => user.email === email)) fail(409, 'An account with that email already exists.');
-      if (role === 'stylist') {
-        const provider = store.providers.find((item) => item.id === providerId);
-        if (!provider || provider.accountUserId) fail(400, 'Choose an available stylist profile.');
+      if (role === 'stylist' && serviceIds.some((id) => !store.services.some((service) => service.id === id))) {
+        fail(400, 'Choose valid services for your stylist profile.');
       }
       const credentials = passwordRecord(password);
+      const providerId = role === 'stylist' ? randomUUID() : null;
       const user = {
-        id: randomUUID(), name, email, role, providerId: providerId || null,
+        id: randomUUID(), name, email, role, providerId,
         favoriteProviderId: '', favoriteServiceId: '',
         passwordSalt: credentials.salt, passwordHash: credentials.hash,
         createdAt: new Date().toISOString()
       };
       store.users.push(user);
-      if (providerId) store.providers.find((item) => item.id === providerId).accountUserId = user.id;
+      if (providerId) {
+        const colors = ['#c36a4f', '#3d766d', '#bd9741', '#6972a1'];
+        store.providers.push({
+          id: providerId,
+          name,
+          title: 'Stylist',
+          color: colors[store.providers.length % colors.length],
+          start: '09:00',
+          end: '17:00',
+          slotDuration: 30,
+          workingDays: [1, 2, 3, 4, 5, 6],
+          serviceIds,
+          accountUserId: user.id
+        });
+      }
       setSession(response, store, user);
-      return user;
+      return { user, provider: providerId ? store.providers.find((item) => item.id === providerId) : null };
     });
-    return sendJson(response, 201, { user: publicUser(result) });
+    const provider = result.provider
+      ? (({ accountUserId, ...profile }) => ({ ...profile, accountAvailable: false }))(result.provider)
+      : null;
+    return sendJson(response, 201, { user: publicUser(result.user), provider });
   }
 
   if (pathname === '/api/auth/login' && request.method === 'POST') {
@@ -368,6 +428,8 @@ async function handleApi(request, response, url) {
   }
 
   if (request.method === 'PATCH' && pathname === '/api/settings') {
+    const user = userFromRequest(await readStore(), request);
+    requireAdmin(user);
     const input = await readBody(request);
     const result = await changeStore((store) => {
       if (typeof input.registrationRequired !== 'boolean') fail(400, 'Choose whether registration is required.');
@@ -379,19 +441,28 @@ async function handleApi(request, response, url) {
 
   const providerMatch = /^\/api\/providers\/([^/]+)$/.exec(pathname);
   if (request.method === 'PATCH' && providerMatch) {
+    const user = requireUser(userFromRequest(await readStore(), request));
     const input = await readBody(request);
     const result = await changeStore((store) => {
       const provider = store.providers.find((item) => item.id === providerMatch[1]);
       if (!provider) fail(404, 'Service provider not found.');
+      if (user.role !== 'admin' && (user.role !== 'stylist' || user.providerId !== provider.id)) {
+        fail(403, 'You can only change availability for your own stylist profile.');
+      }
       const start = minutes(input.start);
       const end = minutes(input.end);
       const duration = Number(input.slotDuration);
-      if (start < 0 || end <= start || ![15, 30, 45, 60, 90, 120].includes(duration) || end - start < duration) {
+      const workingDays = input.workingDays === undefined ? provider.workingDays : input.workingDays;
+      if (start < 0 || end <= start || ![15, 30, 45, 60, 90, 120].includes(duration) || end - start < duration
+        || !Array.isArray(workingDays) || workingDays.length < 1 || workingDays.length > 7
+        || workingDays.some((day) => !Number.isInteger(day) || day < 0 || day > 6)
+        || new Set(workingDays).size !== workingDays.length) {
         fail(400, 'Enter valid working hours and an appointment length that fits within them.');
       }
       provider.start = input.start;
       provider.end = input.end;
       provider.slotDuration = duration;
+      provider.workingDays = workingDays;
       return provider;
     });
     return sendJson(response, 200, { provider: result });
@@ -468,4 +539,5 @@ const server = createServer(async (request, response) => {
   }
 });
 
+await ensureAdminAccount();
 server.listen(port, () => console.log(`Goodday Booking running at http://localhost:${port}`));

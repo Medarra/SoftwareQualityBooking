@@ -20,8 +20,8 @@
       <nav class="main-nav" aria-label="Main navigation">
         <button class="nav-link active" type="button" data-view="book">Book a visit</button>
         <button id="appointments-nav" class="nav-link hidden" type="button" data-view="appointments">My appointments <span id="appointment-count" class="nav-count">0</span></button>
-        <button id="account-nav" class="nav-link hidden" type="button" data-view="account">My account</button>
-        <button id="settings-nav" class="nav-link" type="button" data-view="settings">Studio setup</button>
+        <button id="account-nav" class="nav-link hidden" type="button" data-view="account">My profile</button>
+        <button id="settings-nav" class="nav-link hidden" type="button" data-view="settings">Studio setup</button>
       </nav>
       <div class="studio-status"><span class="status-dot"></span><span>RIVER NORTH, CHICAGO</span></div>
       <div class="auth-actions"><span id="signed-in-name" class="signed-in-name hidden"></span><button id="auth-trigger" class="auth-button" type="button">Sign in</button><button id="sign-out" class="auth-button hidden" type="button">Sign out</button></div>
@@ -96,14 +96,27 @@
           <div><p class="eyebrow">YOUR STUDIO, YOUR WAY</p><h1 id="account-title">My account<span class="heading-period">.</span></h1></div>
           <p class="heading-note">Your favourite people and every visit, all together.</p>
         </div>
-        <form id="preferences-form" class="policy-row preferences-row">
-          <div><span class="settings-kicker">YOUR DEFAULTS</span><h2>Make it your regular</h2><p>We’ll remember these choices next time you book.</p></div>
-          <label class="setting-field"><span>FAVOURITE STYLIST</span><select id="favorite-provider" name="favoriteProviderId"></select></label>
-          <label class="setting-field"><span>FAVOURITE SERVICE</span><select id="favorite-service" name="favoriteServiceId"></select></label>
-          <button class="save-provider" type="submit">Save preferences</button>
-        </form>
-        <div class="provider-settings-heading"><div><span class="settings-kicker">PAST & UPCOMING</span><h2>Your service history</h2></div></div>
-        <div id="account-history" class="appointments-list"></div>
+        <div id="patron-account">
+          <form id="preferences-form" class="policy-row preferences-row">
+            <div><span class="settings-kicker">YOUR DEFAULTS</span><h2>Make it your regular</h2><p>We’ll remember these choices next time you book.</p></div>
+            <label class="setting-field"><span>FAVOURITE STYLIST</span><select id="favorite-provider" name="favoriteProviderId"></select></label>
+            <label class="setting-field"><span>FAVOURITE SERVICE</span><select id="favorite-service" name="favoriteServiceId"></select></label>
+            <button class="save-provider" type="submit">Save preferences</button>
+          </form>
+          <div class="provider-settings-heading"><div><span class="settings-kicker">PAST & UPCOMING</span><h2>Your service history</h2></div></div>
+          <div id="account-history" class="appointments-list"></div>
+        </div>
+        <div id="stylist-account" class="hidden">
+          <div class="provider-settings-heading"><div><span class="settings-kicker">YOUR CALENDAR</span><h2>Availability</h2></div><p>Choose when customers can book with you.</p></div>
+          <form id="stylist-availability-form" class="profile-availability-form">
+            <div id="stylist-profile-name" class="setting-provider"></div>
+            <label class="setting-field"><span>STARTS</span><input name="start" type="time" required></label>
+            <label class="setting-field"><span>ENDS</span><input name="end" type="time" required></label>
+            <label class="setting-field"><span>APPOINTMENT LENGTH</span><select name="slotDuration"></select></label>
+            <fieldset class="working-days-field"><legend>WORKING DAYS</legend><div class="working-day-options"></div></fieldset>
+            <button class="save-provider" type="submit">Save availability</button>
+          </form>
+        </div>
       </section>
 
       <section class="view" id="view-settings" aria-labelledby="settings-title">
@@ -132,8 +145,8 @@
           <label class="field-label" for="auth-role">ACCOUNT TYPE</label>
           <select id="auth-role" name="role"><option value="patron">Customer</option><option value="stylist">Stylist</option></select>
           <div id="stylist-fields" class="hidden">
-            <label class="field-label" for="auth-provider">YOUR STYLIST PROFILE</label>
-            <select id="auth-provider" name="providerId"></select>
+            <span class="field-label">SERVICES YOU OFFER</span>
+            <div id="stylist-services" class="working-day-options stylist-service-options"></div>
             <label class="field-label" for="invite-code">STUDIO INVITATION CODE</label>
             <input id="invite-code" name="inviteCode" type="password" autocomplete="off">
           </div>

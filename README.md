@@ -12,14 +12,24 @@ npm start
 
 Open <http://localhost:3000>. Appointment and studio settings are created in `data/booking.json` on first run and persist between restarts. That local data folder is ignored by Git.
 
-Customers can create an account from **Sign in** to save a favourite stylist and service and review their appointment history. Stylist accounts are linked to one provider profile and can only see and manage that provider's appointments. To enable stylist registration, configure a studio invitation code before starting the server:
+Customers can create an account from **Sign in** to save a favourite stylist and service and review their appointment history. To create a stylist account, choose **Stylist**, select the services offered, and enter the studio invitation code. Registration automatically creates a provider profile using the stylist's name, links it to their account, and sets an initial 9 a.m.–5 p.m. Monday–Saturday schedule. Stylists can adjust their schedule from **My profile** after signing in. Stylist accounts can only see and manage appointments on their linked profile. The local demo invitation code works by default; set a private code before sharing the app:
 
 ```powershell
 $env:STYLIST_INVITE_CODE = "choose-a-private-value"
 npm start
 ```
 
-The current local demo server uses `goodday-demo-team` as its invitation code. Replace it with a private value before sharing the app.
+For a local demo, the stylist invitation code is `goodday-demo-team`. Set `STYLIST_INVITE_CODE` to override it.
+
+The studio administrator account is created automatically when the server starts:
+
+| User (email) | Password |
+| --- | --- |
+| `admin@goodday.studio` | `goodday-admin-2026` |
+
+The administrator is the only account that can open **Studio setup** and change studio-wide booking rules or any provider's availability. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` before the first server start to use different administrator credentials. Customer and stylist sign-up cannot create administrator accounts.
+
+Stylists can sign in and use **My profile** to update their own working hours, appointment length, and working days. Those changes do not grant access to another provider's profile.
 
 ## Included
 
@@ -32,8 +42,8 @@ The current local demo server uses `goodday-demo-team` as its invitation code. R
 - Multiple appointments for different people/providers, including appointments at the same time when each provider is available.
 - Appointment list filters by date and provider.
 
-The JSON API is served by the same application: `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `DELETE /api/auth/session`, `GET|PATCH /api/account`, `GET /api/bootstrap`, `GET /api/availability`, `GET /api/appointments`, `POST /api/appointments`, `PATCH /api/appointments/:id`, `DELETE /api/appointments/:id`, `PATCH /api/providers/:id`, and `PATCH /api/settings`. Appointment-list and mutation routes require a signed-in account and enforce customer ownership or stylist-provider scope.
+The JSON API is served by the same application: `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `DELETE /api/auth/session`, `GET|PATCH /api/account`, `GET /api/bootstrap`, `GET /api/availability`, `GET /api/appointments`, `POST /api/appointments`, `PATCH /api/appointments/:id`, `DELETE /api/appointments/:id`, `PATCH /api/providers/:id`, and `PATCH /api/settings`. Appointment-list and mutation routes require a signed-in account and enforce customer ownership or stylist-provider scope. Studio settings are administrator-only; provider availability can be changed by the administrator or by that provider's linked stylist.
 
 ## Prototype scope
 
-Passwords are stored as salted scrypt hashes, sessions use HTTP-only cookies, and appointment reads and changes are checked against the signed-in account. This MVP does not include email verification, password recovery, rate limiting, production-grade account administration, or secure controls for every studio setting, so it is intended for local evaluation and not direct public deployment.
+Passwords are stored as salted scrypt hashes, sessions use HTTP-only cookies, and appointment reads and changes are checked against the signed-in account. The documented administrator credentials are demo credentials; replace them before sharing the app. This MVP does not include email verification, password recovery, rate limiting, or production-grade account administration, so it is intended for local evaluation and not direct public deployment.

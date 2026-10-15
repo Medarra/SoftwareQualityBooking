@@ -20,11 +20,12 @@ const elements = Object.fromEntries([
   'appointments-list', 'filter-date', 'filter-provider', 'results-count', 'clear-filters',
   'registration-required', 'provider-settings', 'policy-form', 'toast', 'appointments-nav',
   'account-nav', 'settings-nav', 'auth-trigger', 'sign-out', 'signed-in-name', 'auth-dialog',
-  'auth-form', 'auth-name', 'auth-role', 'auth-email', 'auth-password', 'auth-provider',
+  'auth-form', 'auth-name', 'auth-role', 'auth-email', 'auth-password', 'stylist-services',
   'invite-code', 'register-fields', 'stylist-fields', 'auth-title', 'auth-eyebrow',
   'auth-submit', 'auth-note', 'login-mode', 'register-mode', 'close-auth',
   'preferences-form', 'favorite-provider', 'favorite-service', 'account-history', 'book-title', 'appointments-title',
-  'provider-filter-field', 'new-appointment-button'
+  'provider-filter-field', 'new-appointment-button', 'patron-account', 'stylist-account',
+  'stylist-profile-name', 'stylist-availability-form'
 ].map((id) => [id, document.getElementById(id)]));
 
 let authMode = 'login';
@@ -126,6 +127,13 @@ function renderSummary() {
     <p class="summary-detail summary-price">$${service.price}</p>`;
 }
 
+function renderWorkingDays(provider) {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return `<fieldset class="working-days-field"><legend>WORKING DAYS</legend><div class="working-day-options">${days.map((day, index) => `
+    <label><input name="workingDays" type="checkbox" value="${index}"${provider.workingDays.includes(index) ? ' checked' : ''}><span>${day.slice(0, 3)}</span></label>`).join('')}
+  </div></fieldset>`;
+}
+
 // Ask the server for the open times for the currently selected provider and date, then render them as selectable buttons.
 async function loadAvailability() {
   const provider = providerById(state.providerId);
@@ -168,7 +176,9 @@ function updateContactFields() {
 // Switch between the booking, appointments, account, and studio setup screens while protecting role-restricted views.
 function showView(name) {
   if (name === 'appointments' && !state.user) return openAuthDialog();
-  if (name === 'account' && state.user?.role !== 'patron') return;
+  if (name === 'appointments' && !['patron', 'stylist'].includes(state.user?.role)) return;
+  if (name === 'account' && !['patron', 'stylist'].includes(state.user?.role)) return;
+  if (name === 'settings' && state.user?.role !== 'admin') return;
   if (name === 'book' && state.user?.role === 'stylist' && !state.editingId) return;
   document.querySelectorAll('.view').forEach((view) => view.classList.toggle('active', view.id === `view-${name}`));
   document.querySelectorAll('.nav-link').forEach((button) => button.classList.toggle('active', button.dataset.view === name));
@@ -216,6 +226,7 @@ function renderAppointments() {
 
 // Build the studio configuration panel and provider-specific working-hour editors from the state returned by the backend.
 function renderSettings() {
+  if (state.user?.role !== 'admin') return;
   elements['registration-required'].checked = state.settings.registrationRequired;
   elements['provider-settings'].innerHTML = state.providers.map((provider) => `
     <form class="provider-setting-row" data-settings-provider="${escapeHtml(provider.id)}">
@@ -223,6 +234,7 @@ function renderSettings() {
       <label class="setting-field"><span>STARTS</span><input name="start" type="time" value="${escapeHtml(provider.start)}" required></label>
       <label class="setting-field"><span>ENDS</span><input name="end" type="time" value="${escapeHtml(provider.end)}" required></label>
       <label class="setting-field"><span>APPOINTMENT LENGTH</span><select name="slotDuration">${[15, 30, 45, 60, 90, 120].map((duration) => `<option value="${duration}"${duration === provider.slotDuration ? ' selected' : ''}>${duration} minutes</option>`).join('')}</select></label>
+      ${renderWorkingDays(provider)}
       <button class="save-provider" type="submit">Save hours</button>
     </form>`).join('');
 }
@@ -232,9 +244,12 @@ function syncRoleUI() {
   const user = state.user;
   const isStylist = user?.role === 'stylist';
   const isPatron = user?.role === 'patron';
-  elements['appointments-nav'].classList.toggle('hidden', !user);
-  elements['account-nav'].classList.toggle('hidden', !isPatron);
-  elements['provider-filter-field'].classList.toggle('hidden', isStylist);
+  const isAdmin = user?.role === 'admin';
+  elements['appointments-nav'].classList.toggle('hidden', !isPatron && !isStylist);
+  elements['account-nav'].classList.toggle('hidden', !isPatron && !isStylist);
+  elements['account-nav'].textContent = isStylist ? 'My profile' : 'My account';
+  elements['settings-nav'].classList.toggle('hidden', !isAdmin);
+  elements['provider-filter-field'].classList.toggle('hidden', isStylist || isAdmin);
   elements['new-appointment-button'].classList.toggle('hidden', isStylist);
   elements['auth-trigger'].classList.toggle('hidden', Boolean(user));
   elements['sign-out'].classList.toggle('hidden', !user);
@@ -247,14 +262,40 @@ function syncRoleUI() {
   document.querySelector('[data-view="book"]').classList.toggle('hidden', isStylist && !state.editingId);
   document.getElementById('view-book').classList.toggle('hidden', isStylist && !state.editingId);
   if (isPatron && !elements['visitor-name'].value) elements['visitor-name'].value = user.name;
+  document.getElementById('account-title').innerHTML = isStylist
+    ? 'My profile<span class="heading-period">.</span>'
+    : 'My account<span class="heading-period">.</span>';
+  document.querySelector('#view-account .heading-note').textContent = isStylist
+    ? 'Keep your working hours up to date for your customers.'
+    : 'Your favourite people and every visit, all together.';
   if (isStylist) elements['appointments-title'].textContent = 'Your schedule.';
   else elements['appointments-title'].textContent = 'Appointments.';
   updateContactFields();
 }
 
-// Load the signed-in patron’s saved preferences and visit history from the API for the account page.
+// Load the signed-in user’s preferences or their own provider availability for the profile page.
 async function renderAccount() {
-  if (state.user?.role !== 'patron') return;
+  const isPatron = state.user?.role === 'patron';
+  const isStylist = state.user?.role === 'stylist';
+  elements['patron-account'].classList.toggle('hidden', !isPatron);
+  elements['stylist-account'].classList.toggle('hidden', !isStylist);
+  if (isStylist) {
+    const provider = providerById(state.user.providerId);
+    if (!provider) {
+      showToast('Your stylist profile could not be found.');
+      return;
+    }
+    elements['stylist-profile-name'].innerHTML = `<span class="provider-avatar" style="background:${escapeHtml(provider.color)}">${escapeHtml(initials(provider.name))}</span><span><strong>${escapeHtml(provider.name)}</strong><small>${escapeHtml(provider.title)}</small></span>`;
+    const form = elements['stylist-availability-form'];
+    form.elements.start.value = provider.start;
+    form.elements.end.value = provider.end;
+    form.elements.slotDuration.innerHTML = [15, 30, 45, 60, 90, 120].map((duration) =>
+      `<option value="${duration}"${duration === provider.slotDuration ? ' selected' : ''}>${duration} minutes</option>`
+    ).join('');
+    form.querySelector('.working-days-field').outerHTML = renderWorkingDays(provider);
+    return;
+  }
+  if (!isPatron) return;
   try {
     const { user, history } = await api('/api/account');
     state.user = user;
@@ -289,17 +330,16 @@ function setAuthMode(mode) {
   elements['auth-eyebrow'].textContent = registering ? 'A GOOD PLACE TO START' : 'WELCOME BACK';
   elements['auth-submit'].firstElementChild.textContent = registering ? 'Create account' : 'Sign in';
   elements['auth-note'].textContent = registering
-    ? 'Customer accounts remember your favourite stylist, service, and visits. Stylist accounts need a studio invitation code.'
+    ? 'Customer accounts remember your favourite stylist, service, and visits. Stylist profiles are created during registration; stylists need an invitation code.'
     : 'Your account keeps your preferences and appointment history together.';
   elements['login-mode'].classList.toggle('active', !registering);
   elements['register-mode'].classList.toggle('active', registering);
   elements['auth-password'].autocomplete = registering ? 'new-password' : 'current-password';
   const stylist = registering && elements['auth-role'].value === 'stylist';
   elements['stylist-fields'].classList.toggle('hidden', !stylist);
-  elements['auth-provider'].required = stylist;
   elements['invite-code'].required = stylist;
-  elements['auth-provider'].innerHTML = state.providers.map((provider) =>
-    `<option value="${escapeHtml(provider.id)}"${provider.accountAvailable ? '' : ' disabled'}>${escapeHtml(provider.name)}${provider.accountAvailable ? '' : ' · account exists'}</option>`
+  elements['stylist-services'].innerHTML = state.services.map((service) => `
+    <label><input name="serviceIds" type="checkbox" value="${escapeHtml(service.id)}"><span>${escapeHtml(service.name)}</span></label>`
   ).join('');
 }
 
@@ -423,19 +463,27 @@ elements['auth-form'].addEventListener('submit', async (event) => {
   const registering = authMode === 'register';
   const payload = { email: values.get('email'), password: values.get('password') };
   if (registering) {
+    const role = values.get('role');
+    const serviceIds = values.getAll('serviceIds');
+    if (role === 'stylist' && !serviceIds.length) {
+      elements['auth-note'].textContent = 'Choose at least one service for your stylist profile.';
+      elements['auth-note'].classList.add('auth-error');
+      return;
+    }
     Object.assign(payload, {
       name: values.get('name'),
-      role: values.get('role'),
-      providerId: values.get('providerId'),
+      role,
+      serviceIds,
       inviteCode: values.get('inviteCode')
     });
   }
   try {
-    const { user } = await api(`/api/auth/${registering ? 'register' : 'login'}`, {
+    const { user, provider } = await api(`/api/auth/${registering ? 'register' : 'login'}`, {
       method: 'POST',
       body: JSON.stringify(payload)
     });
     state.user = user;
+    if (provider) state.providers.push(provider);
     state.appointments = [];
     elements['auth-dialog'].close();
     elements['auth-password'].value = '';
@@ -443,7 +491,7 @@ elements['auth-form'].addEventListener('submit', async (event) => {
     renderServices();
     renderProviders();
     renderFilterProviders();
-    showView(user.role === 'stylist' ? 'appointments' : 'book');
+    showView(user.role === 'stylist' ? 'appointments' : user.role === 'admin' ? 'settings' : 'book');
     showToast(`Welcome, ${user.name}.`);
   } catch (error) {
     elements['auth-note'].textContent = error.message;
@@ -535,16 +583,42 @@ elements['provider-settings'].addEventListener('submit', async (event) => {
   if (!form) return;
   event.preventDefault();
   const values = new FormData(form);
+  const workingDays = values.getAll('workingDays').map(Number);
   try {
     const { provider } = await api(`/api/providers/${form.dataset.settingsProvider}`, {
       method: 'PATCH',
-      body: JSON.stringify({ start: values.get('start'), end: values.get('end'), slotDuration: Number(values.get('slotDuration')) })
+      body: JSON.stringify({ start: values.get('start'), end: values.get('end'), slotDuration: Number(values.get('slotDuration')), workingDays })
     });
     state.providers = state.providers.map((item) => item.id === provider.id ? provider : item);
     renderSettings();
     renderProviders();
     renderFilterProviders();
     showToast(`${provider.name}'s availability updated.`);
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+elements['stylist-availability-form'].addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const provider = providerById(state.user?.providerId);
+  if (!provider) return showToast('Your stylist profile could not be found.');
+  const values = new FormData(elements['stylist-availability-form']);
+  const workingDays = values.getAll('workingDays').map(Number);
+  try {
+    const { provider: updatedProvider } = await api(`/api/providers/${provider.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        start: values.get('start'),
+        end: values.get('end'),
+        slotDuration: Number(values.get('slotDuration')),
+        workingDays
+      })
+    });
+    state.providers = state.providers.map((item) => item.id === updatedProvider.id ? updatedProvider : item);
+    await renderAccount();
+    renderProviders();
+    showToast('Your availability is saved.');
   } catch (error) {
     showToast(error.message);
   }
@@ -566,7 +640,7 @@ async function start() {
     renderFilterProviders();
     renderAppointments();
     updateContactFields();
-    showView(state.user?.role === 'stylist' ? 'appointments' : 'book');
+    showView(state.user?.role === 'stylist' ? 'appointments' : state.user?.role === 'admin' ? 'settings' : 'book');
   } catch (error) {
     showToast(`Could not connect to the booking service: ${error.message}`);
   }

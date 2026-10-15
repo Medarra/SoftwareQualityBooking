@@ -119,6 +119,14 @@ select:focus, input:focus { border-color: #799c65; box-shadow: 0 0 0 3px #d6ed72
 .provider-settings-heading > p { margin: 0 0 1px; color: var(--muted); font-size: 11px; }
 .provider-settings-list { border-top: 1px solid var(--line); }
 .provider-setting-row { min-height: 78px; display: grid; grid-template-columns: minmax(190px, 1fr) 130px 130px 150px 90px; align-items: center; gap: 16px; padding: 12px 7px; border-bottom: 1px solid var(--line); }
+.working-days-field { grid-column: 1 / -1; margin: 0; padding: 0; border: 0; }
+.working-days-field legend { margin-bottom: 7px; color: #77837c; font-size: 8px; font-weight: 700; letter-spacing: .6px; }
+.working-day-options { display: flex; flex-wrap: wrap; gap: 7px; }
+.working-day-options label { display: inline-flex; align-items: center; gap: 4px; color: #56665f; cursor: pointer; font-size: 10px; }
+.working-day-options input { accent-color: var(--ink); }
+.profile-availability-form { padding: 14px 7px; display: grid; grid-template-columns: minmax(190px, 1fr) 130px 130px 150px; align-items: center; gap: 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: white; }
+.profile-availability-form .working-days-field { grid-column: 1 / -1; }
+.profile-availability-form .save-provider { justify-self: end; min-width: 140px; }
 .setting-provider { display: flex; align-items: center; gap: 10px; }
 .setting-provider strong, .setting-provider small { display: block; }
 .setting-provider strong { font-size: 11px; }
@@ -200,6 +208,9 @@ select:focus, input:focus { border-color: #799c65; box-shadow: 0 0 0 3px #d6ed72
   .provider-setting-row { grid-template-columns: 1fr 1fr; gap: 10px; padding: 14px 2px; }
   .setting-provider { grid-column: 1 / -1; }
   .save-provider { align-self: end; }
+  .profile-availability-form { grid-template-columns: 1fr 1fr; gap: 10px; padding: 14px 2px; }
+  .profile-availability-form .setting-provider, .profile-availability-form .working-days-field { grid-column: 1 / -1; }
+  .profile-availability-form .save-provider { grid-column: 1 / -1; justify-self: stretch; min-height: 38px; }
   .preferences-row { align-items: stretch; }
   .preferences-row > div { flex-basis: 100%; }
   .preferences-row .setting-field { width: calc(50% - 7px); flex: 1 1 calc(50% - 7px); }
