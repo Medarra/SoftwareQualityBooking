@@ -47,3 +47,9 @@ The JSON API is served by the same application: `POST /api/auth/register`, `POST
 ## Prototype scope
 
 Passwords are stored as salted scrypt hashes, sessions use HTTP-only cookies, and appointment reads and changes are checked against the signed-in account. The documented administrator credentials are demo credentials; replace them before sharing the app. This MVP does not include email verification, password recovery, rate limiting, or production-grade account administration, so it is intended for local evaluation and not direct public deployment.
+
+## Booking rules and assignment reflection
+
+Availability, date/time validation, appointment normalization, provider schedule validation, and appointment cancellation/ownership rules are implemented as functions in `booking-rules.js`, independently from the HTTP server and persisted JSON file. The server supplies the current time to availability and appointment validation, so the time-dependent rules can be exercised with a chosen time. Cancellation currently has no minimum-notice rule.
+
+Before the refactor, those booking rules were implemented inside `server.js`, which starts the web server when imported, and availability/date validation read the system clock inside the rule functions. The refactor moved the rules into an independent module and made the current time an explicit argument. 

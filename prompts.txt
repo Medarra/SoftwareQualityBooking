@@ -18,3 +18,17 @@ concurrently (provided availability).
 2. I think it would be neat to make registration mean that you could create an account so you could remember your preferences (favourite stylist, service history, etc), and if you were a stylist you could see who has you booked, and for what.
 
 3. Can you comment the code thouroughly?
+
+4. Okay copilot. I noticed a few things while looking at this. For one, my customer user was able to use Studio Setup. I believe we should have a seperate admin account (please put user and password for that in the read me) and they should have access to that. On the flip side, stylists should be able to change their availability in particular, perhaps through the profile on their end.
+
+5. So, I went ahead to test how creating a stylist account looks. And if a stylist account doesn't exist yet, they wouldn't have a stylist profile. Could we fix that?
+
+6. So I thought that was it, but I want to make sure all of this is covered for assignment purposes:
+
+You need testable code from your team before you write a single test. Check these three things in your team's repository first.
+1.	The booking rules (availability, durations, conflicts, cancellations and so on) exist as methods or classes in your code, not just as ideas in the UI.
+2.	Those methods can be called from a test without starting the web app, opening a browser, or connecting to a real database or network service.
+3.	Time-dependent rules (for example, "cannot cancel within 24 hours") do not read the system clock directly. The date and time should be passed in or supplied through something you can replace in a test.
+If any of these are not true, your team needs to refactor before you continue. That is normal, and it is a useful finding: write down what you had to change, because you will need it for your reflection. If you are unsure whether your code is ready, ask me early.
+
+
