@@ -13,7 +13,7 @@ import { settings } from "node:cluster";
 
 // Unit 1 - Provider's slot duration validation
 // Verifies that provider slot durations fit within working hours and that invalid durations are rejected
-describe("getAvailability", () => {
+describe("BlockDurationValidation", () => {
     it("30MinuteDurationWithinOneHour_ReturnsTwoAvailableSlots", () => {
         // Arrange
         const now = new Date(2026, 11, 7, 8, 0);
@@ -78,7 +78,7 @@ describe("getAvailability", () => {
 // Unit 2 - Provider sets the availability block duration
 // Verifies that providers can configure valid working hours and appointment durations, 
 // including durations that exactly fit within working hours.
-describe("updateProviderAvailability", () => {
+describe("ProviderSetsBlockDuration", () => {
     it("StylistSetsValidDuration_UpdatesAvailability", () => {
         // Arrange
         const store = { 
@@ -163,7 +163,7 @@ describe("updateProviderAvailability", () => {
 
 // Unit 3 - Closing time validation
 // Verifies that patrons can only book slot durations that fit into providers closing time
-describe("ClosingTimeValidation", () => {
+describe("BlockDuration_ClosingTimeValidation", () => {
     // Arrange for valid, boundary and error case
     const date = "2026-12-07";
     const now = new Date(2026, 11, 7, 8, 0);
