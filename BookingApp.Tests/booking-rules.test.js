@@ -9,6 +9,7 @@ import {
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { error } from "node:console";
+import { settings } from "node:cluster";
 
 // Unit 1 - Provider's slot duration validation
 // Verifies that provider slot durations fit within working hours and that invalid durations are rejected
@@ -157,5 +158,80 @@ describe("updateProviderAvailability", () => {
         
         // Check that original settings remain unchanged
         assert.equal(store.providers[0].slotDuration, 30)
+    });
+});
+
+// Unit 3 - Closing time validation
+// Verifies that patrons can only book slot durations that fit into providers closing time
+describe("ClosingTimeValidation", () => {
+    // Arrange for valid, boundary and error case
+    const date = "2026-12-07";
+    const now = new Date(2026, 11, 7, 8, 0);
+
+    function createStore() {
+        return {
+            settings: {registrationRequired: false},
+            users: [],
+            services: [
+                {id: "cut", name: "Signature cut", price: 38}
+            ],
+            providers : [ {
+                id: "jules",
+                name: "Jules Carter",
+                start: "09:00",
+                end: "17:00",
+                slotDuration: 60,
+                workingDays: [1],
+                serviceIds: ["cut"]
+            }],
+            appointments: []
+        };
+    }
+
+    function createInput(time) {
+        return {
+            providerId: "jules",
+            serviceId: "cut",
+            date,
+            time,
+            visitorName: "Nemo",
+            anonymous: true
+        }
+    }
+
+    it("AppointmentBeforeClosing_IsAccepted", () => {
+        // Arrange
+        const store = createStore();
+        const input = createInput("15:00");
+
+        // Act
+        const actual = appointmentInput(store, input, null, null, now);
+
+        //Assert
+        assert.ok(actual);
+    });
+
+    it("AppointmentEndingAtClosing_IsAccepted", () => {
+        // Arrange
+        const store = createStore();
+        const input = createInput("16:00");
+
+        // Act
+        const actual = appointmentInput(store, input, null, null, now);
+
+        //Assert
+        assert.ok(actual);
+    });
+
+    it("AppointmentEndingAfterClosing_ThrowsValidationError", () => {
+        // Arrange
+        const store = createStore();
+        const input = createInput("16:30");
+
+        // Act and Assert
+        assert.throws(
+            () => appointmentInput(store, input, null, null, now),
+            error => error instanceof BookingRuleError && error.status == 409
+        );
     });
 });
