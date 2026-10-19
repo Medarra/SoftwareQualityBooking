@@ -3,6 +3,7 @@ import {
   getAvailability,
   updateProviderAvailability,
   appointmentInput,
+  //getEligibleProviders
 } from "../booking-rules.js";
 
 import { createStore, createInput } from "./test.helpers.js";
@@ -230,3 +231,66 @@ describe("ProviderServiceCompatibility", () => {
     });
 });
 
+// Unit 5 - Provider selection by service
+// Verifies that only providers offering the selected service are available for selection
+// Note: These three tests require an independently testable provider filtering function
+// Current filtering logic is inside renderProviders() in app.js which does not allow to test in isolation
+// The tests fails since getEligibleProviders() is not implemented in the booking-rules.js
+describe("ProviderSelectionByService", () => {
+
+    it("MultipleProvidersOfferService_ReturnsAllEligibleProviders", () => {
+        // Arrange
+        const store = createStore();
+        store.providers.push({
+            id: "imani",
+            name: "Imani Brooks",
+            start: "10:00",
+            end: "18:00",
+            slotDuration: 45,
+            workingDays: [1, 2, 3, 4, 5, 6],
+            serviceIds: ["cut", "colour"]
+        });
+
+        // Act
+        const actual = getEligibleProviders(store.providers, "cut");
+
+        // Assert
+        assert.deepEqual(
+            actual.map(provider => provider.id),
+            ["jules", "imani"]);
+    });
+
+    it("ProviderDoesNotOfferService_ExcludeFromSelection", () => {
+        // Arrange
+        const store = createStore();
+        store.providers.push({
+            id: "imani",
+            name: "Imani Brooks",
+            start: "10:00",
+            end: "18:00",
+            slotDuration: 45,
+            workingDays: [1, 2, 3, 4, 5, 6],
+            serviceIds: ["colour"]
+        });
+
+        // Act
+        const actual = getEligibleProviders(store.providers, "cut");
+
+        // Assert
+        assert.deepEqual(
+            actual.map(provider => provider.id),
+            ["jules"]);
+    });
+
+    it("NoProvidersOfferService_ReturnEmptyList", () => {
+        // Arrange
+        const store = createStore();
+        store.providers[0].serviceIds = ["colour"];
+
+        // Act
+        const actual = getEligibleProviders(store.providers, "cut");
+
+        // Assert
+        assert.deepEqual(actual, []);
+    });
+});
