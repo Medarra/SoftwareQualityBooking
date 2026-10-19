@@ -1,18 +1,18 @@
-import {test, expect} from 'vitest';
-import {appointmentInput} from '../booking-rules.js';
+import { test, expect, vi, afterEach } from 'vitest';
+import { appointmentInput, cancelAppointment } from '../booking-rules.js';
 
 //Set a fixed date/time so tests are repeatable
 const now = new Date(2026, 9, 19, 10, 0);   //Monday, October 19, 2026, 10:00 AM
 
 //Create small sample of data to use in tests
-function createStore(){
-    return{
-        settings: {registrationRequired: false},
+function createStore() {
+    return {
+        settings: { registrationRequired: false },
         users: [],
         appointments: [],
-        services: [{id: 'cut', name: 'Haircut', price: 30}],
+        services: [{ id: 'cut', name: 'Haircut', price: 30 }],
         providers: [{
-            id: 'provider1', 
+            id: 'provider1',
             name: 'Test Stylist',
             serviceIds: ['cut'],
             workingDays: [1, 2, 3, 4, 5, 6],
@@ -23,8 +23,8 @@ function createStore(){
     };
 }
 
-function createInput(date, time){
-    return{
+function createInput(date, time) {
+    return {
         providerId: 'provider1',
         serviceId: 'cut',
         date,
@@ -61,7 +61,7 @@ test('appointmentInput_WhenDateIsYesterday_RejectsBooking', () => {
 
     const action = () => appointmentInput(store, input, null, null, now);
 
-    expect(action).toThrow(expect.objectContaining({status: 400}));
+    expect(action).toThrow(expect.objectContaining({ status: 400 }));
 });
 
 test('appointmentInput_WhenTimeIsExactlyNow_RejectsBooking', () => {
@@ -70,5 +70,121 @@ test('appointmentInput_WhenTimeIsExactlyNow_RejectsBooking', () => {
 
     const action = () => appointmentInput(store, input, null, null, now);
 
-    expect(action).toThrow(expect.objectContaining({status: 409}));
+    expect(action).toThrow(expect.objectContaining({ status: 409 }));
+});
+
+test('appointmentInput_WhenEditingFutureAppointment_AllowsEdit', () => {
+    const store = createStore();
+    const existing = {
+        id: 'appointment1',
+        providerId: 'provider1',
+        serviceId: 'cut',
+        date: '2026-10-20',
+        time: '11:00',
+        patronUserId: null
+    };
+    const input = createInput('2026-10-20', '12:00');
+
+    const result = appointmentInput(store, input, existing, null, now);
+
+    expect(result.time).toBe('12:00');
+});
+
+test('appointmentInput_WhenEditingAppointmentAtCurrentTime_RejectsEdit', () => {
+    const store = createStore();
+    const existing = {
+        id: 'appointment1',
+        providerId: 'provider1',
+        serviceId: 'cut',
+        date: '2026-10-19',
+        time: '10:00',
+        patronUserId: null
+    };
+    const input = createInput('2026-10-19', '12:00');
+
+    const action = () => appointmentInput(store, input, existing, null, now);
+
+    expect(action).toThrow(expect.objectContaining({ status: 400 }));
+});
+
+test('appointmentInput_WhenEditingPastAppointment_RejectsEdit', () => {
+    const store = createStore();
+    const existing = {
+        id: 'appointment1',
+        providerId: 'provider1',
+        serviceId: 'cut',
+        date: '2026-10-18',
+        time: '11:00',
+        patronUserId: null
+    };
+    const input = createInput('2026-10-20', '12:00');
+
+    const action = () => appointmentInput(store, input, existing, null, now);
+
+    expect(action).toThrow(expect.objectContaining({ status: 400 }));
+});
+
+afterEach(() => {
+    vi.useRealTimers();
+});
+
+function createCancellationStore(date, time) {
+    const store = createStore();
+
+    store.appointments.push({
+        id: 'appointment1',
+        providerId: 'provider1',
+        serviceId: 'cut',
+        date,
+        time,
+        patronUserId: null
+    });
+
+    return store;
+}
+
+test('cancelAppointment_WhenMoreThan24HoursRemain_AllowsCancellation', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    const store = createCancellationStore('2026-10-21', '10:00');
+
+    cancelAppointment(store, 'appointment1', {
+        id: 'stylist1',
+        role: 'stylist',
+        providerId: 'provider1'
+    });
+    expect(store.appointments).toHaveLength(0);
+});
+
+test('cancelAppointment_WhenExactly24HoursRemain_RejectsCancellation', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    const store = createCancellationStore('2026-10-20', '10:00');
+
+    const action = () => cancelAppointment(store, 'appointment1', {
+        id: 'stylist1',
+        role: 'stylist',
+        providerId: 'provider1'
+    });
+
+    expect(action).toThrow();
+    expect(store.appointments).toHaveLength(1);
+});
+
+test('cancelAppointment_WhenLessThan24HoursRemain_RejectsCancellation', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    const store = createCancellationStore('2026-10-19', '22:00');
+
+    const action = () => cancelAppointment(store, 'appointment1', {
+        id: 'stylist1',
+        role: 'stylist',
+        providerId: 'provider1'
+    });
+
+    expect(action).toThrow();
+    expect(store.appointments).toHaveLength(1);
 });
