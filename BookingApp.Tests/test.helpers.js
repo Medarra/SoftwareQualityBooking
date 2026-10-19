@@ -16,7 +16,7 @@ export function createStore() {
             end: "17:00",
             slotDuration: 30,
             workingDays: [1, 2, 3, 4, 5, 6],
-            serviceIds: ["cut"]
+            serviceIds: ["cut", "beard"]
         }],
         appointments: []
     };

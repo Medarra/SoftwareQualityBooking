@@ -183,4 +183,50 @@ describe("BlockDuration_ClosingTimeValidation", () => {
     });
 });
 
-// Unit 4 - 
+// Unit 4 - Provider and service compatibility
+// Verifies whether selected provider offers selected service
+describe("ProviderServiceCompatibility", () => {
+    const now = new Date(2026, 11, 7, 8, 0);
+
+    it("ProviderOffersSelectedService_BookingAccepted", () => {
+        // Arrange
+        const store = createStore();
+        const input = createInput();
+        input.serviceId = "beard";
+
+        // Act
+        const actual = appointmentInput(store, input, null, null, now);
+
+        // Assert
+        assert.equal(actual.providerId, "jules");
+        assert.equal(actual.serviceId, "beard");
+    });
+
+    it("ProviderOffersOnlySelectedService_BookingAccepted", () => {
+        // Arrange
+        const store = createStore();
+        store.providers[0].serviceIds = ["beard"];
+        const input = createInput();
+        input.serviceId = "beard";
+
+        // Act
+        const actual = appointmentInput(store, input, null, null, now);
+
+        // Assert
+        assert.equal(actual.serviceId, "beard");
+    });
+
+    it("ProviderDoesNotOfferSelectedService_ThrowsValidationError", () => {
+        // Arrange
+        const store = createStore();
+        const input = createInput();
+        input.serviceId = "colour";
+
+        // Act and Assert
+        assert.throws(
+            () => appointmentInput(store, input, null, null, now),
+            error => error instanceof BookingRuleError && error.status == 400
+        );
+    });
+});
+
