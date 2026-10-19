@@ -1,5 +1,4 @@
-import {test} from 'node:test';
-import assert from 'node:assert/strict';
+import {test, expect} from 'vitest';
 import {appointmentInput} from '../booking-rules.js';
 
 //Set a fixed date/time so tests are repeatable
@@ -44,7 +43,7 @@ test('appointmentInput_WhenDateIsTomorrow_AcceptsBooking', () => {
 
     const result = appointmentInput(store, input, null, null, now);
 
-    assert.equal(result.date, '2026-10-20');
+    expect(result.date).toBe('2026-10-20');
 });
 
 test('appointmentInput_WhenTimeIsLaterToday_AcceptsBooking', () => {
@@ -53,7 +52,7 @@ test('appointmentInput_WhenTimeIsLaterToday_AcceptsBooking', () => {
 
     const result = appointmentInput(store, input, null, null, now);
 
-    assert.equal(result.time, '11:00');
+    expect(result.time).toBe('11:00');
 });
 
 test('appointmentInput_WhenDateIsYesterday_RejectsBooking', () => {
@@ -62,5 +61,14 @@ test('appointmentInput_WhenDateIsYesterday_RejectsBooking', () => {
 
     const action = () => appointmentInput(store, input, null, null, now);
 
-    assert.throws(action, {status: 400});
+    expect(action).toThrow(expect.objectContaining({status: 400}));
+});
+
+test('appointmentInput_WhenTimeIsExactlyNow_RejectsBooking', () => {
+    const store = createStore();
+    const input = createInput('2026-10-19', '10:00');
+
+    const action = () => appointmentInput(store, input, null, null, now);
+
+    expect(action).toThrow(expect.objectContaining({status: 409}));
 });
