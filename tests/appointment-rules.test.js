@@ -37,7 +37,7 @@ function createInput(date, time) {
 }
 
 //Test
-test('appointmentInput_WhenDateIsTomorrow_AcceptsBooking', () => {
+test('appointmentCreation_WhenDateIsTomorrow_AcceptsBooking', () => {
     const store = createStore();
     const input = createInput('2026-10-20', '11:00');
 
@@ -46,7 +46,7 @@ test('appointmentInput_WhenDateIsTomorrow_AcceptsBooking', () => {
     expect(result.date).toBe('2026-10-20');
 });
 
-test('appointmentInput_WhenTimeIsLaterToday_AcceptsBooking', () => {
+test('appointmentCreation_WhenTimeIsLaterToday_AcceptsBooking', () => {
     const store = createStore();
     const input = createInput('2026-10-19', '11:00');
 
@@ -55,7 +55,7 @@ test('appointmentInput_WhenTimeIsLaterToday_AcceptsBooking', () => {
     expect(result.time).toBe('11:00');
 });
 
-test('appointmentInput_WhenDateIsYesterday_RejectsBooking', () => {
+test('appointmentCreation_WhenDateIsYesterday_RejectsBooking', () => {
     const store = createStore();
     const input = createInput('2026-10-18', '11:00');
 
@@ -64,7 +64,7 @@ test('appointmentInput_WhenDateIsYesterday_RejectsBooking', () => {
     expect(action).toThrow(expect.objectContaining({ status: 400 }));
 });
 
-test('appointmentInput_WhenTimeIsExactlyNow_RejectsBooking', () => {
+test('appointmentCreation_WhenTimeIsExactlyNow_RejectsBooking', () => {
     const store = createStore();
     const input = createInput('2026-10-19', '10:00');
 
@@ -73,7 +73,7 @@ test('appointmentInput_WhenTimeIsExactlyNow_RejectsBooking', () => {
     expect(action).toThrow(expect.objectContaining({ status: 409 }));
 });
 
-test('appointmentInput_WhenEditingFutureAppointment_AllowsEdit', () => {
+test('appointmentEditing_WhenEditingFutureAppointment_AllowsEdit', () => {
     const store = createStore();
     const existing = {
         id: 'appointment1',
@@ -90,7 +90,7 @@ test('appointmentInput_WhenEditingFutureAppointment_AllowsEdit', () => {
     expect(result.time).toBe('12:00');
 });
 
-test('appointmentInput_WhenEditingAppointmentAtCurrentTime_RejectsEdit', () => {
+test('appointmentEditing_WhenEditingAppointmentAtCurrentTime_RejectsEdit', () => {
     const store = createStore();
     const existing = {
         id: 'appointment1',
@@ -107,7 +107,7 @@ test('appointmentInput_WhenEditingAppointmentAtCurrentTime_RejectsEdit', () => {
     expect(action).toThrow(expect.objectContaining({ status: 400 }));
 });
 
-test('appointmentInput_WhenEditingPastAppointment_RejectsEdit', () => {
+test('appointmentEditing_WhenEditingPastAppointment_RejectsEdit', () => {
     const store = createStore();
     const existing = {
         id: 'appointment1',
@@ -189,7 +189,7 @@ test('cancelAppointment_WhenLessThan24HoursRemain_RejectsCancellation', () => {
     expect(store.appointments).toHaveLength(1);
 });
 
-test('appointmentInput_RegistrationOptional_GuestCanBook', () => {
+test('OptionalRegistration_RegistrationOptional_GuestCanBook', () => {
     const store = createStore();
     store.settings.registrationRequired = false;
     const input = createInput('2026-10-20', '11:00');
@@ -200,7 +200,7 @@ test('appointmentInput_RegistrationOptional_GuestCanBook', () => {
     expect(result.patronUserId).toBeNull();
 });
 
-test('appointmentInput_RegistrationRequired_RegisteredPatronCanBook', () => {
+test('RequiredRegistration_RegistrationRequired_RegisteredPatronCanBook', () => {
     const store = createStore();
     store.settings.registrationRequired = true;
 
@@ -219,7 +219,7 @@ test('appointmentInput_RegistrationRequired_RegisteredPatronCanBook', () => {
     expect(result.patronUserId).toBe('patron1');
 });
 
-test('appointmentInput_RegistrationRequired_GuestCannotBook', () => {
+test('RequiredRegistration_RegistrationRequired_GuestCannotBook', () => {
     const store = createStore();
     store.settings.registrationRequired = true;
     const input = createInput('2026-10-20', '11:00');
@@ -229,7 +229,7 @@ test('appointmentInput_RegistrationRequired_GuestCannotBook', () => {
     expect(action).toThrow(expect.objectContaining({ status: 401 }));
 });
 
-test('appointmentInput_ValidPatronContact_AcceptsBooking', () => {
+test('PatronContact_ValidPatronContact_AcceptsBooking', () => {
   
   const store = createStore();
   const input = createInput('2026-10-20', '11:00');
@@ -244,7 +244,7 @@ test('appointmentInput_ValidPatronContact_AcceptsBooking', () => {
   expect(result.patronEmail).toBe('customer@example.com');
 });
 
-test('appointmentInput_MissingPatronName_RejectsBooking', () => {
+test('PatronContact_MissingPatronName_RejectsBooking', () => {
   
   const store = createStore();
   const input = createInput('2026-10-20', '11:00');
@@ -259,7 +259,7 @@ test('appointmentInput_MissingPatronName_RejectsBooking', () => {
   );
 });
 
-test('appointmentInput_InvalidPatronEmail_RejectsBooking', () => {
+test('PatronContact_InvalidPatronEmail_RejectsBooking', () => {
   
   const store = createStore();
   const input = createInput('2026-10-20', '11:00');
