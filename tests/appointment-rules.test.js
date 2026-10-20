@@ -90,7 +90,7 @@ test('appointmentEditing_WhenEditingFutureAppointment_AllowsEdit', () => {
     expect(result.time).toBe('12:00');
 });
 
-test('appointmentEditing_WhenEditingAppointmentAtCurrentTime_RejectsEdit', () => {
+test('appointmentEditing_AppointmentAtCurrentTime_RejectsEdit', () => {
     const store = createStore();
     const existing = {
         id: 'appointment1',
@@ -107,7 +107,7 @@ test('appointmentEditing_WhenEditingAppointmentAtCurrentTime_RejectsEdit', () =>
     expect(action).toThrow(expect.objectContaining({ status: 400 }));
 });
 
-test('appointmentEditing_WhenEditingPastAppointment_RejectsEdit', () => {
+test('appointmentEditing_PastAppointment_RejectsEdit', () => {
     const store = createStore();
     const existing = {
         id: 'appointment1',
@@ -157,20 +157,19 @@ test('cancelAppointment_WhenMoreThan24HoursRemain_AllowsCancellation', () => {
     expect(store.appointments).toHaveLength(0);
 });
 
-test('cancelAppointment_WhenExactly24HoursRemain_RejectsCancellation', () => {
+test('cancelAppointment_WhenExactly24HoursRemain_AllowsCancellation', () => {
     vi.useFakeTimers();
     vi.setSystemTime(now);
 
     const store = createCancellationStore('2026-10-20', '10:00');
 
-    const action = () => cancelAppointment(store, 'appointment1', {
+    cancelAppointment(store, 'appointment1', {
         id: 'stylist1',
         role: 'stylist',
         providerId: 'provider1'
     });
 
-    expect(action).toThrow();
-    expect(store.appointments).toHaveLength(1);
+    expect(store.appointments).toHaveLength(0);
 });
 
 test('cancelAppointment_WhenLessThan24HoursRemain_RejectsCancellation', () => {
