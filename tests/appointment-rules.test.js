@@ -188,3 +188,43 @@ test('cancelAppointment_WhenLessThan24HoursRemain_RejectsCancellation', () => {
     expect(action).toThrow();
     expect(store.appointments).toHaveLength(1);
 });
+
+test('appointmentInput_RegistrationOptional_GuestCanBook', () => {
+    const store = createStore();
+    store.settings.registrationRequired = false;
+    const input = createInput('2026-10-20', '11:00');
+    
+    const result = appointmentInput(store, input, null, null, now);
+
+    expect(result).toBeDefined();
+    expect(result.patronUserId).toBeNull();
+});
+
+test('appointmentInput_RegistrationRequired_RegisteredPatronCanBook', () => {
+    const store = createStore();
+    store.settings.registrationRequired = true;
+
+    const patron = {
+        id: 'patron1',
+        role: 'patron',
+        name: 'Test Customer',
+        email: 'test@example.com'
+    };
+
+    store.users.push(patron);
+    const input = createInput('2026-10-20', '11:00');
+
+    const result = appointmentInput(store, input, null, patron, now);
+
+    expect(result.patronUserId).toBe('patron1');
+});
+
+test('appointmentInput_RegistrationRequired_GuestCannotBook', () => {
+    const store = createStore();
+    store.settings.registrationRequired = true;
+    const input = createInput('2026-10-20', '11:00');
+
+    const action = () => appointmentInput(store, input, null, null, now);
+
+    expect(action).toThrow(expect.objectContaining({ status: 401 }));
+});
