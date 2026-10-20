@@ -228,3 +228,48 @@ test('appointmentInput_RegistrationRequired_GuestCannotBook', () => {
 
     expect(action).toThrow(expect.objectContaining({ status: 401 }));
 });
+
+test('appointmentInput_ValidPatronContact_AcceptsBooking', () => {
+  
+  const store = createStore();
+  const input = createInput('2026-10-20', '11:00');
+  input.patronName = 'Test Customer';
+  input.patronEmail = 'customer@example.com';
+
+  
+  const result = appointmentInput(store, input, null, null, now);
+
+  
+  expect(result.patronName).toBe('Test Customer');
+  expect(result.patronEmail).toBe('customer@example.com');
+});
+
+test('appointmentInput_MissingPatronName_RejectsBooking', () => {
+  
+  const store = createStore();
+  const input = createInput('2026-10-20', '11:00');
+  input.patronName = '';
+
+  
+  const action = () => appointmentInput(store, input, null, null, now);
+
+  
+  expect(action).toThrow(
+    expect.objectContaining({ status: 400 })
+  );
+});
+
+test('appointmentInput_InvalidPatronEmail_RejectsBooking', () => {
+  
+  const store = createStore();
+  const input = createInput('2026-10-20', '11:00');
+  input.patronEmail = 'invalid-email';
+
+  
+  const action = () => appointmentInput(store, input, null, null, now);
+
+  
+  expect(action).toThrow(
+    expect.objectContaining({ status: 400 })
+  );
+});
