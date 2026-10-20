@@ -8,8 +8,7 @@ import {
 
 import { createStore, createInput } from "./test.helpers.js";
 
-import { describe, it } from "node:test";
-import assert from "node:assert/strict";
+import { describe, it, expect } from "vitest";
 
 // Unit 1 - Provider's block duration validation
 // Verifies that provider slot durations fit within working hours and that invalid durations are rejected
@@ -31,7 +30,7 @@ describe("BlockDurationValidation", () => {
         const actual = getAvailability( store, provider, "2026-12-07", now);
 
         // Assert
-        assert.deepEqual(actual, ["09:00", "09:30"]);
+        expect(actual).toEqual(["09:00", "09:30"]);
     });
 
     it("60MinuteDurationWithinOneHour_ReturnsOneSlot", () => {
@@ -51,7 +50,7 @@ describe("BlockDurationValidation", () => {
         const actual = getAvailability( store, provider, "2026-12-07", now);
 
         // Assert
-        assert.deepEqual(actual, ["16:00"]);
+        expect(actual).toEqual(["16:00"]);
     });
 
     it("DurationExceedsWorkingHours_ReturnsNoSlots", () => {
@@ -71,7 +70,7 @@ describe("BlockDurationValidation", () => {
         const actual = getAvailability(store, provider, "2026-12-07", now);
 
         // Assert
-        assert.deepEqual(actual, []);
+        expect(actual).toEqual([]);
     });
 });
 
@@ -95,7 +94,7 @@ describe("ProviderSetsBlockDuration", () => {
         const actual = updateProviderAvailability(store, "jules", input, stylist);
 
         // Assert
-        assert.equal(actual.slotDuration, 45)
+        expect(actual.slotDuration).toEqual(45);
     });
 
     it("MinimalValidDuration_UpdatesAvailability", () => {
@@ -113,7 +112,7 @@ describe("ProviderSetsBlockDuration", () => {
         const actual = updateProviderAvailability(store, "jules", input, stylist);
 
         // Assert
-        assert.equal(actual.slotDuration, 15)
+        expect(actual.slotDuration).toEqual(15);
     });
 
     it("StylistSetsInvalidDuration_ThrowValidationError", () => {
@@ -128,13 +127,20 @@ describe("ProviderSetsBlockDuration", () => {
         const stylist = { role: "stylist", providerId: "jules"};
 
         // Act and Assert
-        assert.throws(
-            () => updateProviderAvailability(store, "jules", input, stylist),
-            error => error instanceof BookingRuleError && error.status == 400
-        );
+        let error;
+
+        try {
+            updateProviderAvailability(store, "jules", input, stylist);
+        } catch (caught) {
+            error = caught;
+        }
+
+        // Assert
+        expect(error).toBeInstanceOf(BookingRuleError);
+        expect(error.status).toBe(400);
         
         // Check that original settings remain unchanged
-        assert.equal(store.providers[0].slotDuration, 30)
+        expect(store.providers[0].slotDuration).toEqual(30);
     });
 });
 
@@ -153,7 +159,7 @@ describe("BlockDuration_ClosingTimeValidation", () => {
         const actual = appointmentInput(store, input, null, null, now);
 
         //Assert
-        assert.ok(actual);
+        expect(actual).toBeTruthy();
     });
 
     it("AppointmentEndingAtClosing_IsAccepted", () => {
@@ -166,7 +172,7 @@ describe("BlockDuration_ClosingTimeValidation", () => {
         const actual = appointmentInput(store, input, null, null, now);
 
         //Assert
-        assert.ok(actual);
+        expect(actual).toBeTruthy();
     });
 
     it("AppointmentEndingAfterClosing_ThrowsValidationError", () => {
@@ -176,11 +182,18 @@ describe("BlockDuration_ClosingTimeValidation", () => {
         const input = createInput();
         input.time = "16:30";
 
-        // Act and Assert
-        assert.throws(
-            () => appointmentInput(store, input, null, null, now),
-            error => error instanceof BookingRuleError && error.status == 409
-        );
+        // Act
+        let error;
+
+        try {
+            appointmentInput(store, input, null, null, now);
+        } catch (caught) {
+            error = caught;
+        }
+
+        // Assert
+        expect(error).toBeInstanceOf(BookingRuleError);
+        expect(error.status).toBe(409);
     });
 });
 
@@ -199,8 +212,8 @@ describe("ProviderServiceCompatibility", () => {
         const actual = appointmentInput(store, input, null, null, now);
 
         // Assert
-        assert.equal(actual.providerId, "jules");
-        assert.equal(actual.serviceId, "beard");
+        expect(actual.providerId).toEqual("jules");
+        expect(actual.serviceId).toEqual("beard");
     });
 
     it("ProviderOffersOnlySelectedService_BookingAccepted", () => {
@@ -214,7 +227,7 @@ describe("ProviderServiceCompatibility", () => {
         const actual = appointmentInput(store, input, null, null, now);
 
         // Assert
-        assert.equal(actual.serviceId, "beard");
+        expect(actual.serviceId).toEqual("beard");
     });
 
     it("ProviderDoesNotOfferSelectedService_ThrowsValidationError", () => {
@@ -223,11 +236,18 @@ describe("ProviderServiceCompatibility", () => {
         const input = createInput();
         input.serviceId = "colour";
 
-        // Act and Assert
-        assert.throws(
-            () => appointmentInput(store, input, null, null, now),
-            error => error instanceof BookingRuleError && error.status == 400
-        );
+        // Act
+        let error;
+
+        try {
+            appointmentInput(store, input, null, null, now);
+        } catch (caught) {
+            error = caught;
+        }
+
+        // Assert
+        expect(error).toBeInstanceOf(BookingRuleError);
+        expect(error.status).toBe(400);
     });
 });
 
@@ -255,9 +275,7 @@ describe("ProviderSelectionByService", () => {
         const actual = getEligibleProviders(store.providers, "cut");
 
         // Assert
-        assert.deepEqual(
-            actual.map(provider => provider.id),
-            ["jules", "imani"]);
+        expect(actual.map(provider => provider.id)).toEqual(["jules", "imani"]);
     });
 
     it("ProviderDoesNotOfferService_ExcludeFromSelection", () => {
@@ -277,9 +295,7 @@ describe("ProviderSelectionByService", () => {
         const actual = getEligibleProviders(store.providers, "cut");
 
         // Assert
-        assert.deepEqual(
-            actual.map(provider => provider.id),
-            ["jules"]);
+        expect(actual.map(provider => provider.id)).toEqual(["jules"]);
     });
 
     it("NoProvidersOfferService_ReturnEmptyList", () => {
@@ -291,6 +307,6 @@ describe("ProviderSelectionByService", () => {
         const actual = getEligibleProviders(store.providers, "cut");
 
         // Assert
-        assert.deepEqual(actual, []);
+        expect(actual.map(provider => provider.id)).toEqual([]);
     });
 });
