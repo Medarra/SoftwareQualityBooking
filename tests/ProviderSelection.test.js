@@ -30,6 +30,8 @@ function input(overrides = {}) {
 }
 
 describe('Provider Selection — service compatibility (appointmentInput)', () => {
+//Verify that a provider can be selected when they offer
+//the requested service. 
   test('appointmentInput_ProviderOffersRequestedService_AcceptsSelection', () => {
     // Arrange
     const store = makeStore();
@@ -42,6 +44,8 @@ describe('Provider Selection — service compatibility (appointmentInput)', () =
     expect(result.serviceId).toBe('colour');
   });
 
+  //Patrons should only be able to 
+  //choose services offered by providers
   test('appointmentInput_ProviderOffersOnlyOneOfRequestedServices_RejectsUnsupportedService', () => {
     // Arrange
     const store = makeStore();
@@ -54,6 +58,8 @@ describe('Provider Selection — service compatibility (appointmentInput)', () =
     expect(action).toThrow('Choose a service offered by this provider.');
   });
 
+  //Verify that the application rejects a provider ID that does
+  //not exist. A booking must use a valid provider who offers the requested service.
   test('appointmentInput_UnknownProvider_RejectsSelection', () => {
     // Arrange
     const store = makeStore();
@@ -67,6 +73,8 @@ describe('Provider Selection — service compatibility (appointmentInput)', () =
     expect(action).toThrow('Choose a service offered by this provider.');
   });
 
+  // Verify that the application rejects a service ID that does
+  // not exist. A provider cannot be selected for an unknown service.
   test('appointmentInput_UnknownService_RejectsSelection', () => {
     // Arrange
     const store = makeStore();
@@ -81,6 +89,9 @@ describe('Provider Selection — service compatibility (appointmentInput)', () =
 });
 
 describe('Provider Selection — available provider slots (getAvailability)', () => {
+
+  //Verify that a provider with no existing appointments has
+  //an available slot at their opening time of 09:00.
   test('getAvailability_ProviderHasNoBookings_ReturnsOpeningSlot', () => {
     // Arrange
     const store = makeStore();
@@ -93,6 +104,9 @@ describe('Provider Selection — available provider slots (getAvailability)', ()
     expect(slots).toContain('09:00');
   });
 
+   //Boundary: An appointment ending exactly at 10:30 should
+  //not prevent another appointment from starting at 10:30.
+  //The occupied 10:00 slot must remain unavailable.
   test('getAvailability_BookingExactlyBeforeNextSlot_KeepsNextSlotAvailable', () => {
     // Arrange
     const store = makeStore();
@@ -107,6 +121,9 @@ describe('Provider Selection — available provider slots (getAvailability)', ()
     expect(slots).toContain('10:30');
   });
 
+  //Verify that an appointment booked with Jules does not
+  //affect Leo's availability. Different providers should
+  //be available for appointments at the same time.
   test('getAvailability_ProviderBookedAtTime_DoesNotBlockOtherProvider', () => {
     // Arrange
     const store = makeStore();
