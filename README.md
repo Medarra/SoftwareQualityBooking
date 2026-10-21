@@ -44,6 +44,25 @@ Stylists can sign in and use **My profile** to update their own working hours, a
 
 The JSON API is served by the same application: `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `DELETE /api/auth/session`, `GET|PATCH /api/account`, `GET /api/bootstrap`, `GET /api/availability`, `GET /api/appointments`, `POST /api/appointments`, `PATCH /api/appointments/:id`, `DELETE /api/appointments/:id`, `PATCH /api/providers/:id`, and `PATCH /api/settings`. Appointment-list and mutation routes require a signed-in account and enforce customer ownership or stylist-provider scope. Studio settings are administrator-only; provider availability can be changed by the administrator or by that provider's linked stylist.
 
+## Unit tests
+
+Run the Node.js built-in test suite with:
+
+```sh
+npm test
+```
+
+The tests are kept in `tests/` and exercise these booking-rule units:
+
+- `parseBookingDate` — leap-year dates, invalid calendar dates, and malformed date formats.
+- `timeToMinutes` — valid times, the earliest/latest valid times, and malformed or out-of-range times.
+- `getAvailability` — slots within working hours, overlapping appointment conflicts, same-day past/current slot exclusion, and ignoring the appointment currently being edited.
+- `appointmentInput` — normalized guest bookings, same-day and past-date validation, booking conflicts, and editing an appointment without conflicting with itself.
+- `updateProviderAvailability` — valid schedule updates, a duration that exactly fits working hours, and a duration that does not fit.
+- `cancelAppointment` — cancellation by the patron who owns the appointment, denied cancellation by another patron, and a missing appointment.
+
+Fixtures and dates are supplied by each test, so the suite does not start the server, access persisted booking data, or depend on the system clock.
+
 ## Prototype scope
 
 Passwords are stored as salted scrypt hashes, sessions use HTTP-only cookies, and appointment reads and changes are checked against the signed-in account. The documented administrator credentials are demo credentials; replace them before sharing the app. This MVP does not include email verification, password recovery, rate limiting, or production-grade account administration, so it is intended for local evaluation and not direct public deployment.
