@@ -3,8 +3,9 @@ import {
   getAvailability,
   updateProviderAvailability,
   appointmentInput,
-  //getEligibleProviders
 } from "../booking-rules.js";
+
+import { getEligibleProviders } from "../public/provider-rules.js";
 
 import { createStore, createInput } from "./test.helpers.js";
 
