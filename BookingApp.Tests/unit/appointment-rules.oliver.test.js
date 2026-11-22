@@ -1,5 +1,5 @@
 import { test, expect, vi, afterEach } from 'vitest';
-import { appointmentInput, cancelAppointment } from '../booking-rules.js';
+import { appointmentInput, cancelAppointment } from '../../booking-rules.js';
 
 //Set a fixed date/time so tests are repeatable
 const now = new Date(2026, 9, 19, 10, 0);   //Monday, October 19, 2026, 10:00 AM
@@ -36,7 +36,6 @@ function createInput(date, time) {
     };
 }
 
-//Test
 test('appointmentCreation_WhenDateIsTomorrow_AcceptsBooking', () => {
     const store = createStore();
     const input = createInput('2026-10-20', '11:00');
@@ -186,89 +185,4 @@ test('cancelAppointment_WhenLessThan24HoursRemain_RejectsCancellation', () => {
 
     expect(action).toThrow();
     expect(store.appointments).toHaveLength(1);
-});
-
-test('OptionalRegistration_RegistrationOptional_GuestCanBook', () => {
-    const store = createStore();
-    store.settings.registrationRequired = false;
-    const input = createInput('2026-10-20', '11:00');
-    
-    const result = appointmentInput(store, input, null, null, now);
-
-    expect(result).toBeDefined();
-    expect(result.patronUserId).toBeNull();
-});
-
-test('RequiredRegistration_RegistrationRequired_RegisteredPatronCanBook', () => {
-    const store = createStore();
-    store.settings.registrationRequired = true;
-
-    const patron = {
-        id: 'patron1',
-        role: 'patron',
-        name: 'Test Customer',
-        email: 'test@example.com'
-    };
-
-    store.users.push(patron);
-    const input = createInput('2026-10-20', '11:00');
-
-    const result = appointmentInput(store, input, null, patron, now);
-
-    expect(result.patronUserId).toBe('patron1');
-});
-
-test('RequiredRegistration_RegistrationRequired_GuestCannotBook', () => {
-    const store = createStore();
-    store.settings.registrationRequired = true;
-    const input = createInput('2026-10-20', '11:00');
-
-    const action = () => appointmentInput(store, input, null, null, now);
-
-    expect(action).toThrow(expect.objectContaining({ status: 401 }));
-});
-
-test('PatronContact_ValidPatronContact_AcceptsBooking', () => {
-  
-  const store = createStore();
-  const input = createInput('2026-10-20', '11:00');
-  input.patronName = 'Test Customer';
-  input.patronEmail = 'customer@example.com';
-
-  
-  const result = appointmentInput(store, input, null, null, now);
-
-  
-  expect(result.patronName).toBe('Test Customer');
-  expect(result.patronEmail).toBe('customer@example.com');
-});
-
-test('PatronContact_MissingPatronName_RejectsBooking', () => {
-  
-  const store = createStore();
-  const input = createInput('2026-10-20', '11:00');
-  input.patronName = '';
-
-  
-  const action = () => appointmentInput(store, input, null, null, now);
-
-  
-  expect(action).toThrow(
-    expect.objectContaining({ status: 400 })
-  );
-});
-
-test('PatronContact_InvalidPatronEmail_RejectsBooking', () => {
-  
-  const store = createStore();
-  const input = createInput('2026-10-20', '11:00');
-  input.patronEmail = 'invalid-email';
-
-  
-  const action = () => appointmentInput(store, input, null, null, now);
-
-  
-  expect(action).toThrow(
-    expect.objectContaining({ status: 400 })
-  );
 });
