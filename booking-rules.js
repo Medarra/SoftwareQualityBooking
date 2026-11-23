@@ -27,7 +27,7 @@ function localDateString(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-function slotIsFree(store, provider, date, time, ignoreId) {
+export function slotIsFree(store, provider, date, time, ignoreId) {
   const startsAt = timeToMinutes(time);
   const endsAt = startsAt + provider.slotDuration;
   return !store.appointments.some((appointment) => {
@@ -72,6 +72,15 @@ export function appointmentInput(store, input, existing, user, now) {
 
   if (!provider || !service || !provider.serviceIds.includes(service.id)) fail(400, 'Choose a service offered by this provider.');
   if (!parseBookingDate(date) || date < localDateString(now)) fail(400, 'Choose a valid date that is not in the past.');
+  // REFACTOR: Validation to prevent user from editing a past or current apppointment
+  if (existing){
+    const existingDateTime = new Date(`${existing.date}T${existing.time}`);
+
+    if (existingDateTime <= now){
+      fail(400, 'Past appointments cannot be edited.');
+    }
+  }
+  // END REFACTOR
   if (!visitorName) fail(400, 'Enter the name of the person attending.');
   if (store.settings.registrationRequired && !user && !existing) fail(401, 'Create an account or sign in to book at this studio.');
   if (store.settings.registrationRequired && anonymous) fail(400, 'This studio requires an account to book.');
@@ -130,9 +139,19 @@ function requireAppointmentAccess(user, appointment) {
   fail(403, 'You do not have access to this appointment.');
 }
 
-export function cancelAppointment(store, appointmentId, user) {
+export function cancelAppointment(store, appointmentId, user, now = new Date()) { //Refactored to add now as a variable equal to current date/time
   const index = store.appointments.findIndex((item) => item.id === appointmentId);
   if (index < 0) fail(404, 'Appointment not found.');
   requireAppointmentAccess(user, store.appointments[index]);
+
+  // REFACTOR: Validation to prevent a user from cancelling an appointment with less than 24 hour notice
+  const appointment = store.appointments[index];
+  const appointmentDateTime = new Date(`${appointment.date}T${appointment.time}`);
+  const hoursRemaining = (appointmentDateTime - now) / (1000 * 60 * 60);
+
+  if (hoursRemaining < 24){
+    fail(400, 'Appointments cannot be cancelled with less than 24 hours notice.');
+  }
+  // END REFACTOR
   return store.appointments.splice(index, 1)[0];
 }

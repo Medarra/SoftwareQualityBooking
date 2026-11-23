@@ -44,6 +44,27 @@ Stylists can sign in and use **My profile** to update their own working hours, a
 
 The JSON API is served by the same application: `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `DELETE /api/auth/session`, `GET|PATCH /api/account`, `GET /api/bootstrap`, `GET /api/availability`, `GET /api/appointments`, `POST /api/appointments`, `PATCH /api/appointments/:id`, `DELETE /api/appointments/:id`, `PATCH /api/providers/:id`, and `PATCH /api/settings`. Appointment-list and mutation routes require a signed-in account and enforce customer ownership or stylist-provider scope. Studio settings are administrator-only; provider availability can be changed by the administrator or by that provider's linked stylist.
 
+## Unit tests
+
+The unit tests use Vitest and are located in `BookingApp.Tests/unit/`. Install their dependencies and run the suite from the repository root:
+
+```powershell
+npm ci --prefix BookingApp.Tests
+npm --prefix BookingApp.Tests test
+```
+
+The suite is organized by behavior:
+
+- `appointment-rules.test.js` — date/time parsing, booking validation and editing, and cancellation ownership.
+- `availability.test.js` — working days and hours, same-day slot boundaries, booking conflicts, and ignored bookings when editing.
+- `block-durations.test.js` — slot generation, schedule updates and authorization, and appointments near closing time.
+- `booking-for-others.test.js` — booking for another person and registration requirements.
+- `conflict-detection.test.js` — overlapping appointments, back-to-back bookings, and provider-specific conflicts.
+- `provider-selection.test.js` — service compatibility and filtering providers by service.
+- `fixtures.js` — shared test data and booking-rule error helpers.
+
+Tests supply their own dates and current time. They do not start the server, access persisted booking data, or depend on the system clock.
+
 ## Prototype scope
 
 Passwords are stored as salted scrypt hashes, sessions use HTTP-only cookies, and appointment reads and changes are checked against the signed-in account. The documented administrator credentials are demo credentials; replace them before sharing the app. This MVP does not include email verification, password recovery, rate limiting, or production-grade account administration, so it is intended for local evaluation and not direct public deployment.

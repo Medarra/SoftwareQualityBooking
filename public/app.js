@@ -1,5 +1,7 @@
 // The client keeps the current booking session, signed-in user, providers, services, and any transient UI state
 // in one place so rendering functions can react consistently to server data and user actions.
+import { getEligibleProviders } from "./provider-rules.js";
+
 const state = {
   settings: { registrationRequired: false },
   user: null,
@@ -98,7 +100,7 @@ function renderServices() {
 // Providers are filtered by the selected service and user role so stylists can only view their own schedule while patrons see relevant options.
 function renderProviders() {
   const service = serviceById(elements['service-select'].value);
-  let availableProviders = state.providers.filter((provider) => provider.serviceIds.includes(service?.id));
+  let availableProviders = getEligibleProviders(state.providers, service?.id);
   if (state.user?.role === 'stylist') availableProviders = availableProviders.filter((provider) => provider.id === state.user.providerId);
   if (state.user?.role === 'patron' && state.user.favoriteProviderId) {
     const favorite = availableProviders.find((provider) => provider.id === state.user.favoriteProviderId);
