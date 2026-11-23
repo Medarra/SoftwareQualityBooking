@@ -13,7 +13,7 @@ import {
 
 const root = dirname(fileURLToPath(import.meta.url));
 const publicDirectory = resolve(root, 'public');
-const dataFile = resolve(root, 'data', 'booking.json');
+const dataFile = resolve(root, process.env.BOOKING_DATA_FILE || 'data/booking.json');
 const port = Number(process.env.PORT || 3000);
 const adminEmail = (process.env.ADMIN_EMAIL || 'admin@goodday.studio').trim().toLowerCase();
 const adminPassword = process.env.ADMIN_PASSWORD || 'goodday-admin-2026';
