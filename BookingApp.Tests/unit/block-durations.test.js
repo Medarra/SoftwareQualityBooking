@@ -78,6 +78,19 @@ describe('updateProviderAvailability', () => {
       .toBe('09:30');
   });
 
+  it('accepts a schedule with one minute left after a slot', () => {
+    const store = createStore();
+    const input = {
+      start: '09:00',
+      end: '09:31',
+      slotDuration: 30,
+      workingDays: [1]
+    };
+
+    expect(updateProviderAvailability(store, 'jules', input, { role: 'admin' }).end)
+      .toBe('09:31');
+  });
+
   it('accepts schedules at the minimum and maximum supported durations', () => {
     for (const [end, slotDuration] of [['09:15', 15], ['10:00', 60]]) {
       const store = createStore();

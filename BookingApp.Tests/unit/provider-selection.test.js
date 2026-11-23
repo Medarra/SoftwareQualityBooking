@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { appointmentInput } from '../../booking-rules.js';
 import { getEligibleProviders } from '../../public/provider-rules.js';
-import { createInput, createStore } from './fixtures.js';
+import { caughtRuleError, createInput, createStore } from './fixtures.js';
+
+const now = new Date(2026, 11, 7, 8, 0);
 
 describe('provider and service compatibility', () => {
-  const now = new Date(2026, 11, 7, 8, 0);
-
   it('accepts a booking for a service offered by the selected provider', () => {
     const store = createStore();
     const input = createInput();
@@ -29,7 +29,26 @@ describe('provider and service compatibility', () => {
     const input = createInput();
     input.serviceId = 'colour';
 
-    expect(() => appointmentInput(store, input, null, null, now)).toThrow();
+    expect(caughtRuleError(() => appointmentInput(store, input, null, null, now))
+      ?.status).toBe(400);
+  });
+
+  it('rejects an unknown provider', () => {
+    const store = createStore();
+    const input = createInput();
+    input.providerId = 'missing-provider';
+
+    expect(caughtRuleError(() => appointmentInput(store, input, null, null, now))
+      ?.status).toBe(400);
+  });
+
+  it('rejects an unknown service', () => {
+    const store = createStore();
+    const input = createInput();
+    input.serviceId = 'missing-service';
+
+    expect(caughtRuleError(() => appointmentInput(store, input, null, null, now))
+      ?.status).toBe(400);
   });
 });
 
@@ -45,6 +64,13 @@ describe('getEligibleProviders', () => {
       workingDays: [1, 2, 3, 4, 5, 6],
       serviceIds: ['cut', 'colour']
     });
+
+    const imaniInput = createInput();
+    imaniInput.providerId = 'imani';
+    imaniInput.serviceId = 'colour';
+    imaniInput.time = '10:00';
+    expect(appointmentInput(store, imaniInput, null, null, now))
+      .toMatchObject({ providerId: 'imani', serviceId: 'colour' });
 
     expect(getEligibleProviders(store.providers, 'cut').map(({ id }) => id))
       .toEqual(['jules', 'imani']);

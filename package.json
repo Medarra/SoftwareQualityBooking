@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand"
+    "test": "vitest run --reporter=verbose"
   },
   "devDependencies": {
-    "jest": "^30.5.2"
+    "vitest": "^5.0.5"
   }
 }

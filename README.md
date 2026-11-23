@@ -1,10 +1,11 @@
 # Goodday Studio Booking
 
-A small full-stack appointment booking app for a multi-provider studio. It uses a Node.js HTTP server, a responsive browser interface, and a JSON file for local persistence; there are no package dependencies.
+A small full-stack appointment booking app for a multi-provider studio. It uses a Node.js HTTP server, a responsive browser interface, and a JSON file for local persistence; it has no runtime package dependencies.
 
 ## Run locally
 
 Requires Node.js 18 or newer.
+Running the Vitest suite requires Node.js 22.12+, 24.x, or 26+.
 
 ```sh
 npm start
@@ -46,21 +47,22 @@ The JSON API is served by the same application: `POST /api/auth/register`, `POST
 
 ## Unit tests
 
-The unit tests use Vitest and are located in `BookingApp.Tests/unit/`. Install their dependencies and run the suite from the repository root:
+The unit tests use Vitest and are located in `BookingApp.Tests/unit/`. Install dependencies and run the suite from the repository root:
 
 ```powershell
-npm ci --prefix BookingApp.Tests
-npm --prefix BookingApp.Tests test
+npm ci
+npm test
 ```
 
 The suite is organized by behavior:
 
-- `appointment-rules.test.js` — date/time parsing, booking validation and editing, and cancellation ownership.
+- `appointment-rules.test.js` — date/time parsing, booking validation and editing, cancellation ownership, and the 24-hour cancellation boundary.
 - `availability.test.js` — working days and hours, same-day slot boundaries, booking conflicts, and ignored bookings when editing.
 - `block-durations.test.js` — slot generation, schedule updates and authorization, and appointments near closing time.
 - `booking-for-others.test.js` — booking for another person and registration requirements.
 - `conflict-detection.test.js` — overlapping appointments, back-to-back bookings, and provider-specific conflicts.
 - `provider-selection.test.js` — service compatibility and filtering providers by service.
+- `patron-registration.test.js` — optional/required registration and booking contact validation.
 - `fixtures.js` — shared test data and booking-rule error helpers.
 
 Tests supply their own dates and current time. They do not start the server, access persisted booking data, or depend on the system clock.
@@ -71,6 +73,6 @@ Passwords are stored as salted scrypt hashes, sessions use HTTP-only cookies, an
 
 ## Booking rules and assignment reflection
 
-Availability, date/time validation, appointment normalization, provider schedule validation, and appointment cancellation/ownership rules are implemented as functions in `booking-rules.js`, independently from the HTTP server and persisted JSON file. The server supplies the current time to availability and appointment validation, so the time-dependent rules can be exercised with a chosen time. Cancellation currently has no minimum-notice rule.
+Availability, date/time validation, appointment normalization, provider schedule validation, and appointment cancellation/ownership rules are implemented as functions in `booking-rules.js`, independently from the HTTP server and persisted JSON file. The server supplies the current time to availability and appointment validation; cancellation uses the current time by default and accepts an explicit time in tests. Cancellation requires at least 24 hours' notice.
 
 Before the refactor, those booking rules were implemented inside `server.js`, which starts the web server when imported, and availability/date validation read the system clock inside the rule functions. The refactor moved the rules into an independent module and made the current time an explicit argument. 

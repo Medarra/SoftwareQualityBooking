@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getAvailability } from '../../booking-rules.js';
-import { booking, fixture } from './fixtures.js';
+import { booking, createStore, fixture } from './fixtures.js';
 
 describe('getAvailability', () => {
   it('returns slots on a working day without bookings', () => {
@@ -29,6 +29,17 @@ describe('getAvailability', () => {
     const { store, provider, now } = fixture();
 
     expect(getAvailability(store, provider, '2026-10-20', now)).toEqual([]);
+  });
+
+  it.each([
+    ['Saturday before the non-working Sunday', '2026-10-24', ['09:00', '09:30']],
+    ['Sunday between working days', '2026-10-25', []],
+    ['Monday after the non-working Sunday', '2026-10-26', ['09:00', '09:30']]
+  ])('handles %s', (_description, date, expected) => {
+    const { store, provider, now } = fixture();
+    provider.workingDays = [1, 6];
+
+    expect(getAvailability(store, provider, date, now)).toEqual(expected);
   });
 
   it('excludes past and current slots when checking today', () => {
@@ -66,5 +77,26 @@ describe('getAvailability', () => {
 
     expect(getAvailability(store, provider, '2026-10-19', now, existing.id))
       .toEqual(['09:00', '09:30']);
+  });
+
+  it('does not let one provider booking block another provider', () => {
+    const store = createStore();
+    const jules = store.providers[0];
+    const leo = { ...jules, id: 'leo', name: 'Leo Nguyen' };
+    store.providers.push(leo);
+    store.appointments.push({
+      id: 'appointment-1',
+      providerId: jules.id,
+      date: '2026-12-07',
+      time: '09:00',
+      durationMinutes: 30
+    });
+
+    expect(getAvailability(
+      store,
+      leo,
+      '2026-12-07',
+      new Date(2026, 11, 6, 8, 0)
+    )).toContain('09:00');
   });
 });
