@@ -46,22 +46,24 @@ The JSON API is served by the same application: `POST /api/auth/register`, `POST
 
 ## Unit tests
 
-Run the Node.js built-in test suite with:
+The unit tests use Vitest and are located in `BookingApp.Tests/unit/`. Install their dependencies and run the suite from the repository root:
 
-```sh
-npm test
+```powershell
+npm ci --prefix BookingApp.Tests
+npm --prefix BookingApp.Tests test
 ```
 
-The tests are kept in `tests/` and exercise these booking-rule units:
+The suite is organized by behavior:
 
-- `parseBookingDate` — leap-year dates, invalid calendar dates, and malformed date formats.
-- `timeToMinutes` — valid times, the earliest/latest valid times, and malformed or out-of-range times.
-- `getAvailability` — slots within working hours, overlapping appointment conflicts, same-day past/current slot exclusion, and ignoring the appointment currently being edited.
-- `appointmentInput` — normalized guest bookings, same-day and past-date validation, booking conflicts, and editing an appointment without conflicting with itself.
-- `updateProviderAvailability` — valid schedule updates, a duration that exactly fits working hours, and a duration that does not fit.
-- `cancelAppointment` — cancellation by the patron who owns the appointment, denied cancellation by another patron, and a missing appointment.
+- `appointment-rules.test.js` — date/time parsing, booking validation and editing, and cancellation ownership.
+- `availability.test.js` — working days and hours, same-day slot boundaries, booking conflicts, and ignored bookings when editing.
+- `block-durations.test.js` — slot generation, schedule updates and authorization, and appointments near closing time.
+- `booking-for-others.test.js` — booking for another person and registration requirements.
+- `conflict-detection.test.js` — overlapping appointments, back-to-back bookings, and provider-specific conflicts.
+- `provider-selection.test.js` — service compatibility and filtering providers by service.
+- `fixtures.js` — shared test data and booking-rule error helpers.
 
-Fixtures and dates are supplied by each test, so the suite does not start the server, access persisted booking data, or depend on the system clock.
+Tests supply their own dates and current time. They do not start the server, access persisted booking data, or depend on the system clock.
 
 ## Prototype scope
 

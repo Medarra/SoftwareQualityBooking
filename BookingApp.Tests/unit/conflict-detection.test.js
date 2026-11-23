@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { slotIsFree } from '../../booking-rules.js';
-import { fixture, booking } from './fixtures.tian.js';
+import { fixture, booking } from './fixtures.js';
 
 describe('slotIsFree', () => {
   it('slotIsFree_OtherProviderBooked_ReturnsTrue', () => {
