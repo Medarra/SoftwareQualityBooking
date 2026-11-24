@@ -1,7 +1,18 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { startTestServer } from "./test-server.js";
 import { randomUUID } from "node:crypto";
 
-const BASE_URL = "http://localhost:3001";
+let testServer;
+let BASE_URL;
+
+beforeEach(async () => {
+    testServer = await startTestServer();
+    BASE_URL = testServer.url;
+}, 20000);
+
+afterEach(async () => {
+    await testServer?.stop();
+}, 10000);
 
 describe("POST /api/auth/register", () => {
     // Verify that a customer can register with valid information
@@ -56,7 +67,10 @@ describe("POST /api/auth/register", () => {
                                                                                                 role: "patron"
                                                                         })                         
         });
+        
+        const data = await response.json();
 
         expect(response.status).toBe(400);
+        expect(data.error).toBe("Use a password with at least 10 characters.");
     });
 });
