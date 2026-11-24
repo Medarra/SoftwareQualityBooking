@@ -217,6 +217,7 @@ test('UI-03 Cancel appointment and release slot', async ({ page }) => {
 
 // UI-04: Prevent guest booking when registration is required.
 test('UI-04 Registration required prevents guest booking', async ({ page }) => {
+
     // Arrange
     await openBooking(page);
 
@@ -233,44 +234,147 @@ test('UI-04 Registration required prevents guest booking', async ({ page }) => {
 
     await page.locator('#auth-submit').click();
 
-    await expect(
-        page.locator('#registration-required')
-    ).toBeVisible();
+    await expect(page.locator('#registration-required'))
+        .toBeVisible();
 
     // Enable mandatory registration.
-    await page.locator('#registration-required').check();
+    await page.locator('#policy-form .switch-track').click();
 
     await expect(page.locator('#toast'))
         .toContainText('Booking policy updated.');
 
-    // Sign out to become an unregistered visitor.
+    // Sign out of the administrator account.
     await page.locator('#sign-out').click();
 
     await expect(page.locator('#auth-trigger')).toBeVisible();
 
-    await selectBooking(page);
+    await expect(page.locator('#signed-in-name')).toBeHidden();
 
-    // Act
+    await selectBooking(page);
     await slot(page, '10:00').click();
 
+    // Enter valid booking information.
     await page.locator('#visitor-name').fill('Guest Test');
     await page.locator('#patron-name').fill('Guest Test');
     await page.locator('#patron-email').fill('guest@example.test');
 
-    await page.locator('#submit-booking').click();
+
+    // Act
+    const [bookingResponse] = await Promise.all([
+        page.waitForResponse(response =>
+            new URL(response.url()).pathname === '/api/appointments' &&
+            response.request().method() === 'POST'
+        ),
+        page.locator('#submit-booking').click()
+    ]);
+
 
     // Assert
+    // Verify that the server rejects the guest booking.
+    expect([401, 403]).toContain(bookingResponse.status());
+
     await expect(page.locator('#toast')).toContainText(
         'Create an account or sign in to book at this studio.'
     );
 
-    await expect(
-        page.locator('#anonymous-control')
-    ).toBeHidden();
+    await expect(page.locator('#anonymous-control'))
+        .toBeHidden();
 
-    // Verify that the attempted booking did not occupy the slot.
-    await page.reload();
+    // Verify that the rejected booking did not occupy the slot.
+    await openBooking(page);
     await selectBooking(page);
 
     await expect(slot(page, '10:00')).toBeVisible();
+});
+
+// UI-05: Verify that registration policy changes persist.
+test('UI-05 Registration policy changes persist after reload', async ({ page }) => {
+
+    // Arrange
+    await openBooking(page);
+
+    // Sign in as the studio administrator.
+    await page.locator('#auth-trigger').click();
+
+    await page.locator('#auth-email').fill(
+        process.env.ADMIN_EMAIL || 'admin@goodday.studio'
+    );
+
+    await page.locator('#auth-password').fill(
+        process.env.ADMIN_PASSWORD || 'goodday-admin-2026'
+    );
+
+    await page.locator('#auth-submit').click();
+
+    const registrationRequired = page.locator(
+        '#registration-required'
+    );
+
+    const policySwitch = page.locator(
+        '#policy-form .switch-track'
+    );
+
+    await expect(registrationRequired).toBeVisible();
+
+    // Verify the initial registration policy.
+    await expect(registrationRequired).not.toBeChecked();
+
+
+    // Act
+    // Enable mandatory registration.
+    const [enableResponse] = await Promise.all([
+        page.waitForResponse(response =>
+            new URL(response.url()).pathname === '/api/settings' &&
+            response.request().method() === 'PATCH'
+        ),
+        policySwitch.click()
+    ]);
+
+
+    // Assert
+    expect(enableResponse.status()).toBe(200);
+
+    await expect(registrationRequired).toBeChecked();
+
+    await expect(page.locator('#toast'))
+        .toContainText('Booking policy updated.');
+
+    // Verify that the enabled policy persists after reload.
+    await page.reload();
+
+    await expect(registrationRequired).toBeVisible();
+    await expect(registrationRequired).toBeChecked();
+
+
+    // Act
+    // Disable mandatory registration.
+    const [disableResponse] = await Promise.all([
+        page.waitForResponse(response =>
+            new URL(response.url()).pathname === '/api/settings' &&
+            response.request().method() === 'PATCH'
+        ),
+        policySwitch.click()
+    ]);
+
+    // Assert
+    expect(disableResponse.status()).toBe(200);
+
+    await expect(registrationRequired).not.toBeChecked();
+
+    await expect(page.locator('#toast'))
+        .toContainText('Booking policy updated.');
+
+    // Verify that the disabled policy persists after reload.
+    await page.reload();
+
+    await expect(registrationRequired).toBeVisible();
+    await expect(registrationRequired).not.toBeChecked();
+
+    // Sign out and verify that anonymous booking is available.
+    await page.locator('#sign-out').click();
+
+    await expect(page.locator('#auth-trigger')).toBeVisible();
+
+    await expect(page.locator('#anonymous-control'))
+        .toBeVisible();
 });
