@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { startTestServer } from "./test-server.js";
-import { getFutureBookingDate } from "./date-helpers.js";
+import { getFutureBookingDate, loginTestAdmin } from "./helpers.js";
 
 let testServer;
 let BASE_URL;
@@ -62,22 +62,7 @@ describe("POST /api/appointments - booking without registration", () => {
     // Verify that a guest cannot book when registration is required
     it ("rejects anonymous booking when registration is required", async() => {
         // Sign in as administrator
-        const loginResponse = await fetch(`${BASE_URL}/api/auth/login`, {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({
-                email: process.env.ADMIN_EMAIL || "admin@goodday.studio",
-                password: process.env.ADMIN_PASSWORD || "goodday-admin-2026"
-            })
-        });
-
-        expect(loginResponse.status).toBe(200);
-
-        // Extract the administrator's session cookie
-        const sessionCookie = loginResponse.headers.get("set-cookie");
-        expect(sessionCookie).toBeTruthy();
-
-        const cookie = sessionCookie.split(";")[0];
+        const { cookie } = await loginTestAdmin(BASE_URL);
 
         // Enable mandatory registration
         const settingsResponse = await fetch(`${BASE_URL}/api/settings`, { method: "PATCH",
@@ -93,7 +78,6 @@ describe("POST /api/appointments - booking without registration", () => {
 
         // Attempt to book without authentication
         const date = getFutureBookingDate();
-
         const response = await fetch(`${BASE_URL}/api/appointments`, { method: "POST",
                                                                         headers: {"Content-Type": "application/json"},
                                                                         body: JSON.stringify({ providerId: "jules",
