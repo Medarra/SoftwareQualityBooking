@@ -84,17 +84,22 @@ jobs:
 
       - run: mkdir -p test-results
 
-      - name: Run UI Tests
+      - name: Install Playwright
+        run: |
+          npm install --no-save --package-lock=false @playwright/test
+          npx playwright install --with-deps chromium
+
+      - name: Start Application
         shell: bash
         run: |
-          if find BookingApp.Tests/ui -type f -name '*.spec.js' -size +0c -print -quit | grep -q .; then
-            npm test -- BookingApp.Tests/ui \
-              --reporter=default \
-              --reporter=junit \
-              --outputFile.junit=test-results/junit.xml
-          else
-            echo "No UI tests found; skipping UI test execution."
-          fi
+          node server.js > test-results/server.log 2>&1 &
+          echo $! > test-results/server.pid
+          curl --retry 30 --retry-delay 1 --retry-all-errors --fail http://127.0.0.1:3000/api/bootstrap
+
+      - name: Run UI Tests
+        env:
+          PLAYWRIGHT_JUNIT_OUTPUT_NAME: test-results/playwright.xml
+        run: npx playwright test BookingApp.Tests/ui --reporter=line,junit
 
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
