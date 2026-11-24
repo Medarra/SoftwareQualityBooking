@@ -1,4 +1,4 @@
-# Goodday Studio Booking
+# Goodday Studio Booking 
 
 A small full-stack appointment booking app for a multi-provider studio. It uses a Node.js HTTP server, a responsive browser interface, and a JSON file for local persistence; it has no runtime package dependencies.
 
