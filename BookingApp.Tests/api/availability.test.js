@@ -66,12 +66,19 @@ describe("GET /api/availability", () => {
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Representing_dates_times
 function getFutureWorkDay() {
     const date = new Date();
-    date.setDate(date.getDate() +7);
+    date.setDate(date.getDate() + 7);
+
+    // For debuging
+    console.log("Before adjustment:", date.toDateString());
+    console.log("Day of week:", date.getDay());
+    console.log("Day of month:", date.getDate());
 
     // Move Sunday to Monday because provider doesn't work Sundays
-    if(date.getDate() === 0) {
+    if(date.getDay() === 0) {
         date.setDate(date.getDate() + 1);
     }
+
+    console.log("Final working day:", date.toDateString());
 
     return [date.getFullYear(),
             String(date.getMonth() + 1).padStart(2, "0"),
