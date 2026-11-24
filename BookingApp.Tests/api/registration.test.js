@@ -56,7 +56,7 @@ describe("POST /api/auth/register", () => {
     });
 
     // Verify that registration is rejected when password is shorter that 10 characters
-    it ("accepts password with exactly 10 characters", async () => {
+    it ("rejects password shorter than minimum length", async () => {
         const email = `test${randomUUID()}@mail.com`;
 
         const response = await fetch(`${BASE_URL}/api/auth/register`, {method: "POST",
