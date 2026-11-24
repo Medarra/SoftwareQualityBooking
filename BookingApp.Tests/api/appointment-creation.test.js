@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { startTestServer } from './test-server.js';
-import { getFutureBookingDate } from './date-helpers.js';
+import { getFutureBookingDate, registerTestPatron } from './helpers.js';
 
 describe('POST /api/appointments', () => {
     let testServer;
@@ -16,8 +16,9 @@ describe('POST /api/appointments', () => {
     }, 10000);
 
 
-    it('creates an appointment with valid booking details', async () => {
+    it('creates a valid appointment for a registered customer', async () => {
         // Arrange
+        const { user, cookie } = await registerTestPatron(testServer.url);
         const date = getFutureBookingDate();
 
         const booking = {
@@ -25,15 +26,16 @@ describe('POST /api/appointments', () => {
             serviceId: 'cut',
             date: date,
             time: '09:00',
-            visitorName: 'Test Customer',
-            anonymous: true
+            visitorName: user.name,
+            anonymous: false
         };
 
         // Act
         const response = await fetch(`${testServer.url}/api/appointments`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Cookie': cookie
             },
             body: JSON.stringify(booking)
         });
@@ -47,8 +49,12 @@ describe('POST /api/appointments', () => {
             serviceId: 'cut',
             date: date,
             time: '09:00',
-            visitorName: 'Test Customer',
-            anonymous: true
+            visitorName: user.name,
+            anonymous: false,
+            patronUserId: user.id,
+            patronName: user.name,
+            patronEmail: user.email,
+            durationMinutes: 30
         });
         expect(data.appointment.id).toBeTruthy();
     });
