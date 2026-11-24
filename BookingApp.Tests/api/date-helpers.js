@@ -1,5 +1,5 @@
 // Helper function to get a future booking date to test with
-export function getFutureWorkDay(daysAhead = 2) {
+export function getFutureBookingDate(daysAhead = 2) {
     const date = new Date();
     date.setDate(date.getDate() + daysAhead);
 
