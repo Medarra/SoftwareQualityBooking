@@ -14,8 +14,6 @@ afterEach(async () => {
     await testServer?.stop();
 }, 10000);
 
-// const { user, cookie } = await registerTestPatron(BASE_URL);
-//const date = getFutureBookingDate();
 
 describe( "POST api/appointment - booking for others", () => {
     // Verify that registered patron can book for another person
