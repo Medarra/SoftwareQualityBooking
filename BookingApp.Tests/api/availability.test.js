@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { startTestServer } from "./test-server.js";
-import { getFutureBookingDate } from "./date-helpers.js";
+import { getFutureBookingDate } from "./helpers.js";
 
 let testServer;
 let BASE_URL;
