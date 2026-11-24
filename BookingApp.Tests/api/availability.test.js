@@ -1,6 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { startTestServer } from "./test-server.js";
 
-const BASE_URL = "http://localhost:3001";
+let testServer;
+let BASE_URL;
+
+beforeEach(async () => {
+    testServer = await startTestServer();
+    BASE_URL = testServer.url;
+}, 20000);
+
+afterEach(async () => {
+    await testServer?.stop();
+}, 10000);
 
 describe("GET /api/availability", () => {
     // Verify that an existing provider has available booking slots
