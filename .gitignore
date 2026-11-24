@@ -1,2 +1,11 @@
 node_modules/
 data/
+
+# API test data
+data/booking.test.json
+data/booking.test.json.tmp
+
+# Environment variables 
+.env
+.env.*
+!.env.example
