@@ -201,4 +201,82 @@ describe('POST /api/appointments', () => {
     });
 
 
+    // Verify provider-specific appointment duration
+    it('creates an appointment using the provider block duration', async () => {
+        // Arrange
+        const { user, cookie } = await registerTestPatron(testServer.url);
+        const date = getFutureBookingDate();
+
+        const booking = {
+            providerId: 'imani',
+            serviceId: 'cut',
+            date: date,
+            time: '10:00',
+            visitorName: user.name,
+            anonymous: false
+        };
+
+        // Act
+        const response = await fetch(`${testServer.url}/api/appointments`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cookie': cookie
+            },
+            body: JSON.stringify(booking)
+        });
+
+        const data = await response.json();
+
+        // Assert
+        expect(response.status).toBe(201);
+        expect(data.appointment.durationMinutes).toBe(45);
+
+        // Verify the booked slot is unavailable
+        const availabilityResponse = await fetch(
+            `${testServer.url}/api/availability?providerId=imani&date=${date}`
+        );
+
+        const availabilityData = await availabilityResponse.json();
+
+        expect(availabilityResponse.status).toBe(200);
+        expect(availabilityData.slots).not.toContain('10:00');
+        expect(availabilityData.slots).toContain('10:45');
+    });
+
+
+    // Reject an appointment that does not align with provider block duration
+    it('rejects a booking outside the provider appointment blocks', async () => {
+        // Arrange
+        const { user, cookie } = await registerTestPatron(testServer.url);
+        const date = getFutureBookingDate();
+
+        const booking = {
+            providerId: 'imani',
+            serviceId: 'cut',
+            date: date,
+            time: '10:30',
+            visitorName: user.name,
+            anonymous: false
+        };
+
+        // Act
+        const response = await fetch(`${testServer.url}/api/appointments`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cookie': cookie
+            },
+            body: JSON.stringify(booking)
+        });
+
+        const data = await response.json();
+
+        // Assert
+        expect(response.status).toBe(409);
+        expect(data.error).toBe(
+            'That appointment time is no longer available. Choose another slot.'
+        );
+    });
+
 });
