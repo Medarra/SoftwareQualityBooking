@@ -133,7 +133,7 @@ export function updateProviderAvailability(store, providerId, input, user) {
   return provider;
 }
 
-function requireAppointmentAccess(user, appointment) {
+export function requireAppointmentAccess(user, appointment) {
   if (user.role === 'stylist' && appointment.providerId === user.providerId) return;
   if (user.role === 'patron' && appointment.patronUserId === user.id) return;
   fail(403, 'You do not have access to this appointment.');

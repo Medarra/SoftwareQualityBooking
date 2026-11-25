@@ -8,7 +8,8 @@ import {
   cancelAppointment,
   getAvailability,
   timeToMinutes,
-  updateProviderAvailability
+  updateProviderAvailability,
+  requireAppointmentAccess
 } from './booking-rules.js';
 
 const root = dirname(fileURLToPath(import.meta.url));
